@@ -2,11 +2,6 @@
 #include "save_location.h"
 #include "constants/maps.h"
 
-// specialSaveWarp flags
-#define POKECENTER_SAVEWARP (1 << 1)
-#define LOBBY_SAVEWARP (1 << 2)
-#define UNK_SPECIAL_SAVE_WARP_FLAG_3 (1 << 3)
-
 static bool32 IsCurMapInLocationList(const u16 *list)
 {
     s32 i;
@@ -57,10 +52,10 @@ static const u16 sSaveLocationPokeCenterList[] =
     MAP_EVER_GRANDE_CITY_POKEMON_LEAGUE_2F,
     MAP_BATTLE_FRONTIER_POKEMON_CENTER_1F,
     MAP_BATTLE_FRONTIER_POKEMON_CENTER_2F,
-    MAP_SINGLE_BATTLE_COLOSSEUM,
+    MAP_BATTLE_COLOSSEUM_2P,
     MAP_TRADE_CENTER,
     MAP_RECORD_CORNER,
-    MAP_DOUBLE_BATTLE_COLOSSEUM,
+    MAP_BATTLE_COLOSSEUM_4P,
     0xFFFF,
 };
 
@@ -94,26 +89,26 @@ static bool32 sub_81AFCEC(void)
 static void TrySetPokeCenterWarpStatus(void)
 {
     if (IsCurMapPokeCenter() == FALSE)
-        gSaveBlock2Ptr->specialSaveWarp &= ~(POKECENTER_SAVEWARP);
+        gSaveBlock2Ptr->specialSaveWarpFlags &= ~(POKECENTER_SAVEWARP);
     else
-        gSaveBlock2Ptr->specialSaveWarp |= POKECENTER_SAVEWARP;
+        gSaveBlock2Ptr->specialSaveWarpFlags |= POKECENTER_SAVEWARP;
 }
 
 static void TrySetReloadWarpStatus(void)
 {
     if (!IsCurMapReloadLocation())
-        gSaveBlock2Ptr->specialSaveWarp &= ~(LOBBY_SAVEWARP);
+        gSaveBlock2Ptr->specialSaveWarpFlags &= ~(LOBBY_SAVEWARP);
     else
-        gSaveBlock2Ptr->specialSaveWarp |= LOBBY_SAVEWARP;
+        gSaveBlock2Ptr->specialSaveWarpFlags |= LOBBY_SAVEWARP;
 }
 
 // this function definitely sets a warp status, but because the list is empty, it's unknown what this does yet.
 static void sub_81AFD5C(void)
 {
     if (!sub_81AFCEC())
-        gSaveBlock2Ptr->specialSaveWarp &= ~(UNK_SPECIAL_SAVE_WARP_FLAG_3);
+        gSaveBlock2Ptr->specialSaveWarpFlags &= ~(UNK_SPECIAL_SAVE_WARP_FLAG_3);
     else
-        gSaveBlock2Ptr->specialSaveWarp |= UNK_SPECIAL_SAVE_WARP_FLAG_3;
+        gSaveBlock2Ptr->specialSaveWarpFlags |= UNK_SPECIAL_SAVE_WARP_FLAG_3;
 }
 
 void TrySetMapSaveWarpStatus(void)
@@ -123,18 +118,21 @@ void TrySetMapSaveWarpStatus(void)
     sub_81AFD5C();
 }
 
-void sub_81AFDA0(void)
+// In FRLG, only 0x1, 0x10, and 0x20 are set when the pokedex is received
+// 0x2, 0x4, 0x8, and 0x8000 are instead set by SetPostgameFlags
+// These flags are read by Pokemon Colosseum/XD for linking. XD Additionally requires FLAG_SYS_GAME_CLEAR
+void SetUnlockedPokedexFlags(void)
 {
-    gSaveBlock2Ptr->field_A8 |= 0x8000;
-    gSaveBlock2Ptr->field_A8 |= 0x1;
-    gSaveBlock2Ptr->field_A8 |= 0x2;
-    gSaveBlock2Ptr->field_A8 |= 0x4;
-    gSaveBlock2Ptr->field_A8 |= 0x10;
-    gSaveBlock2Ptr->field_A8 |= 0x20;
-    gSaveBlock2Ptr->field_A8 |= 0x8;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x8000;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x1;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x2;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x4;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x10;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x20;
+    gSaveBlock2Ptr->gcnLinkFlags |= 0x8;
 }
 
-void sub_81AFDD0(void)
+void SetChampionSaveWarp(void)
 {
-    gSaveBlock2Ptr->specialSaveWarp |= 0x80;
+    gSaveBlock2Ptr->specialSaveWarpFlags |= CHAMPION_SAVEWARP;
 }

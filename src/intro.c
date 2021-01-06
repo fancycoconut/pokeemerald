@@ -5,7 +5,7 @@
 #include "task.h"
 #include "title_screen.h"
 #include "libgcnmultiboot.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "gpu_regs.h"
 #include "link.h"
 #include "multiboot_pokemon_colosseum.h"
@@ -21,20 +21,80 @@
 #include "intro.h"
 #include "graphics.h"
 #include "sound.h"
-#include "constants/species.h"
 #include "util.h"
 #include "title_screen.h"
 #include "constants/rgb.h"
 #include "constants/battle_anim.h"
 
+/*
+ * Intro animation sequence state machine
+ * --------------------------------------
+ * 
+ * Entry Point: CB2_InitCopyrightScreenAfterBootup
+ * 
+ * Note: States advance sequentially unless otherwise stated.
+ * 
+ * CB2_InitCopyrightScreenAfterBootup
+ *  - Registers a serial interrupt handler that listens for a GameCube.
+ *  - Waits for 140 frames, and then until palette fading completes.
+ *  - Stops looking for a GameCube for dualboot.
+ *  - Check the save file for corruption
+ *  - Setup global pointers to save file
+ *  - Initialize gHeap
+ * 
+ * MainCB2_Intro
+ *  - Spawn Task_IntroLoadPart1Graphics
+ *  - If any keys are pressed during the intro, advance to
+ *    MainCB2_EndIntro (which will then kill all tasks).
+ * 
+ * Task_IntroLoadPart1Graphics
+ * Task_IntroFadeIn (frame counter starts at 0 here)
+ * Task_IntroWaterDrops
+ *  - At frame 128 of this state, spawn Task_IntroWaterDrops_1
+ *  - At frame 256 of this state, spawn Task_IntroWaterDrops_2
+ *  - At frame 560 of this state, spawn Task_IntroWaterDrops_3
+ * Task_IntroScrollDownAndShowFlygon
+ * Task_IntroWaitToSetupPart2
+ * Task_IntroLoadPart2Graphics
+ * Task_IntroStartBikeRide
+ *  - Spawn Task_AdvanceBicycleAnimation
+ * Task_IntroHandleBikeAndFlygonMovement
+ *  - At frame 1856, kills the bicycle animation task
+ * Task_IntroWaitToSetupPart3
+ * Task_IntroLoadPart3Graphics (frame counter resets to 0 here)
+ * Task_IntroSpinAndZoomPokeball
+ *  - Continues until the zoom reaches a certain point
+ * Task_IntroWaitToSetupPart3LegendsFight
+ * Task_IntroLoadGroudonScene
+ * Task_IntroLoadPart3Graphics1
+ * Task_IntroLoadPart3Graphics2
+ * Task_IntroLoadPart3Graphics3
+ * Task_IntroLoadPart3Graphics4
+ * Task_IntroGroudonScene
+ * Task_IntroLoadKyogreScene
+ * Task_IntroKyogreScene
+ * Task_IntroLoadClouds1
+ * Task_IntroLoadClouds2
+ * Task_IntroLoadClouds3
+ * Task_IntroCloudsScene
+ * Task_IntroLoadRayquazaLightningScene
+ * Task_IntroRayquazaLightningScene
+ * Task_IntroLoadRayquazaGlowScene
+ * Task_IntroRayquazaGlowScene_0
+ *  - Runs concurrently with Task_IntroRayquazaGlowScene_1
+ * Task_EndIntroMovie
+ * MainCB2_EndIntro
+ *  - Advances to CB2_InitTitleScreen
+ */
+
 extern const struct CompressedSpriteSheet gBattleAnimPicTable[];
 extern const struct CompressedSpritePalette gBattleAnimPaletteTable[];
-extern const struct SpriteTemplate gUnknown_08596C10[];
+extern const struct SpriteTemplate gAncientPowerRockSpriteTemplate[];
 
 //ewram
-EWRAM_DATA u16 gUnknown_0203BCC8 = 0;
+EWRAM_DATA u16 gIntroCharacterGender = 0;
 EWRAM_DATA u16 gUnknown_0203BCCA = 0;
-EWRAM_DATA u16 gUnknown_0203BCCC = 0;
+EWRAM_DATA u16 gIntroGraphicsFlygonYOffset = 0;
 
 //iwram
 u32 gIntroFrameCounter;
@@ -67,12 +127,12 @@ static const u8 sUnknownBytes[] = {
     0x10, 0x11, 0x12, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x02, 0x0D, 0x0E, 0x0F, 0x10,
     0x11, 0x12, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x00
 };
-static const struct CompressedSpriteSheet gUnknown_085E4A74[] =
+static const struct CompressedSpriteSheet gIntroSpriteSheet_Sparkle[] =
 {
     {gIntro1SparkleGfx, 0x400, 1505},
     {NULL},
 };
-static const struct SpritePalette gUnknown_085E4A84[] =
+static const struct SpritePalette gIntroPalette_Lightning[] =
 {
     {gIntro3LightningPal, 1505},
     {NULL},
@@ -80,14 +140,14 @@ static const struct SpritePalette gUnknown_085E4A84[] =
 static const struct OamData gUnknown_085E4A94 =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(16x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(16x16),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -132,14 +192,14 @@ static const u8 gUnknown_085E4AD0[][2] =
     {0xD0, 0x26},
     {0x00, 0x00},
 };
-static const struct CompressedSpriteSheet gUnknown_085E4AE8[] =
+static const struct CompressedSpriteSheet gIntroPokemonRunningSpriteSheet[] =
 {
     {gIntro2VolbeatGfx, 0x400, 1500},
     {gIntro2TorchicGfx, 0xC00, 1501},
     {gIntro2ManectricGfx, 0x2000, 1502},
     {NULL},
 };
-static const struct SpritePalette gUnknown_085E4B08[] =
+static const struct SpritePalette gIntroPokemonRunningPalette[] =
 {
     {gIntro2VolbeatPal, 1500},
     {gIntro2TorchicPal, 1501},
@@ -149,14 +209,14 @@ static const struct SpritePalette gUnknown_085E4B08[] =
 static const struct OamData gUnknown_085E4B28 =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(32x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x32),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -186,14 +246,14 @@ static const struct SpriteTemplate gUnknown_085E4B40 =
 static const struct OamData gUnknown_085E4B58 =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(32x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x32),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -242,14 +302,14 @@ static const struct SpriteTemplate gUnknown_085E4BA4 =
 static const struct OamData gUnknown_085E4BBC =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(64x64),
     .x = 0,
     .matrixNum = 0,
-    .size = 3,
+    .size = SPRITE_SIZE(64x64),
     .tileNum = 0,
     .priority = 1,
     .paletteNum = 0,
@@ -278,12 +338,12 @@ static const struct SpriteTemplate gUnknown_085E4BDC =
     .affineAnims = gDummySpriteAffineAnimTable,
     .callback = sub_816DAE8,
 };
-static const struct CompressedSpriteSheet gUnknown_085E4BF4[] =
+static const struct CompressedSpriteSheet gIntroRayquazaLightningSpriteSheet[] =
 {
     {gIntro3LightningGfx, 0xC00, 1503},
     {NULL},
 };
-static const struct SpritePalette gUnknown_085E4C04[] =
+static const struct SpritePalette gIntroRayquazaLightningPalette[] =
 {
     {gIntro3LightningPal, 1503},
     {NULL},
@@ -291,14 +351,14 @@ static const struct SpritePalette gUnknown_085E4C04[] =
 static const struct OamData gUnknown_085E4C14 =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(32x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x32),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -328,8 +388,8 @@ static const union AnimCmd *const gUnknown_085E4C40[] =
     gUnknown_085E4C28,
     gUnknown_085E4C34,
 };
-static void sub_816EC6C(struct Sprite *sprite);
-static const struct SpriteTemplate gUnknown_085E4C4C =
+static void SpriteCB_IntroRayquazaLightning(struct Sprite *sprite);
+static const struct SpriteTemplate gIntroLightningSprite =
 {
     .tileTag = 1503,
     .paletteTag = 1503,
@@ -337,9 +397,9 @@ static const struct SpriteTemplate gUnknown_085E4C4C =
     .anims = gUnknown_085E4C40,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_816EC6C,
+    .callback = SpriteCB_IntroRayquazaLightning,
 };
-static const s16 gUnknown_085E4C64[][3] =
+static const s16 gIntroGroudonRockData[][3] =
 {
     {0x68, 0x00, 0x0C0},
     {0x8E, 0x03, 0x280},
@@ -358,7 +418,7 @@ static const struct SpritePalette gUnknown_085E4C98[] =
     {gIntro2BubblesPal, 1504},
     {NULL},
 };
-static const s16 gUnknown_085E4CA8[][3] =
+static const s16 gIntroKyogreBubbleData[][3] =
 {
     {0x42, 0x40, 0x1},
     {0x60, 0x60, 0x8},
@@ -376,14 +436,14 @@ static const s16 gUnknown_085E4CA8[][3] =
 static const struct OamData gUnknown_085E4CF0 =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 2,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(16x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(16x32),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -402,7 +462,7 @@ static const union AnimCmd *const gUnknown_085E4D10[] =
 {
     gUnknown_085E4CF8,
 };
-static void sub_816E7B4(struct Sprite *sprite);
+static void SpriteCB_IntroKyogreBubbles(struct Sprite *sprite);
 static const struct SpriteTemplate gUnknown_085E4D14 =
 {
     .tileTag = 1504,
@@ -411,19 +471,19 @@ static const struct SpriteTemplate gUnknown_085E4D14 =
     .anims = gUnknown_085E4D10,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_816E7B4,
+    .callback = SpriteCB_IntroKyogreBubbles,
 };
 static const struct OamData gUnknown_085E4D2C =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(32x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x32),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -457,7 +517,7 @@ static const union AnimCmd *const gUnknown_085E4D54[] =
     gUnknown_085E4D4C,
 };
 static void sub_816F454(struct Sprite *sprite);
-static const struct SpriteTemplate gUnknown_085E4D64 =
+static const struct SpriteTemplate gIntroWaterDropSprite =
 {
     .tileTag = 2000,
     .paletteTag = 2000,
@@ -497,7 +557,7 @@ static const union AnimCmd gUnknown_085E4DB4[] =
     ANIMCMD_FRAME(256, 16),
     ANIMCMD_END,
 };
-static const union AnimCmd *const gUnknown_085E4DC4[] =
+static const union AnimCmd *const gIntroBicycleAnimationCommands[] =
 {
     gUnknown_085E4D7C,
     gUnknown_085E4D90,
@@ -507,14 +567,14 @@ static const union AnimCmd *const gUnknown_085E4DC4[] =
 static const struct OamData gUnknown_085E4DD4 =
 {
     .y = 160,
-    .affineMode = 3,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_DOUBLE,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(16x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(16x16),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -523,14 +583,14 @@ static const struct OamData gUnknown_085E4DD4 =
 static const struct OamData gUnknown_085E4DDC =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(8x8),
     .x = 0,
     .matrixNum = 0,
-    .size = 0,
+    .size = SPRITE_SIZE(8x8),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -539,14 +599,14 @@ static const struct OamData gUnknown_085E4DDC =
 static const struct OamData gUnknown_085E4DE4 =
 {
     .y = 160,
-    .affineMode = 3,
-    .objMode = 1,
+    .affineMode = ST_OAM_AFFINE_DOUBLE,
+    .objMode = ST_OAM_OBJ_BLEND,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 2,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(32x64),
     .x = 0,
     .matrixNum = 0,
-    .size = 3,
+    .size = SPRITE_SIZE(32x64),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -739,14 +799,14 @@ static const u8 gUnknown_085E4FA4[] =
 static const struct OamData gUnknown_085E4FB0 =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 1,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(64x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 3,
+    .size = SPRITE_SIZE(64x32),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -772,17 +832,17 @@ static const struct SpriteTemplate gUnknown_085E4FC4 =
     .affineAnims = gDummySpriteAffineAnimTable,
     .callback = sub_816FEDC,
 };
-static const struct CompressedSpriteSheet gUnknown_085E4FDC[] =
+static const struct CompressedSpriteSheet gIntroSpriteSheet_WaterDropAndLogo[] =
 {
     {gIntroTiles, 0x1400, 2000},
     {NULL},
 };
-static const struct CompressedSpriteSheet gUnknown_085E4FEC[] =
+static const struct CompressedSpriteSheet gIntroSpriteSheet_Flygon[] =
 {
     {gIntro1FlygonGfx, 0x400, 2002},
     {NULL},
 };
-static const struct SpritePalette gUnknown_085E4FFC[] =
+static const struct SpritePalette gIntroPalette_DropLogoFlygon[] =
 {
     {gIntro1DropsPal, 2000},
     {gIntro1GFLogoPal, 2001},
@@ -792,14 +852,14 @@ static const struct SpritePalette gUnknown_085E4FFC[] =
 static const struct OamData gUnknown_085E501C =
 {
     .y = 160,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(64x64),
     .x = 0,
     .matrixNum = 0,
-    .size = 3,
+    .size = SPRITE_SIZE(64x64),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -814,8 +874,8 @@ static const union AnimCmd *const gUnknown_085E502C[] =
 {
     gUnknown_085E5024,
 };
-static void sub_8170040(struct Sprite *sprite);
-static const struct SpriteTemplate gUnknown_085E5030 =
+static void SpriteCB_IntroRayquazaHyperbeam(struct Sprite *sprite);
+static const struct SpriteTemplate gIntroRayquazaHyperbeamSprite =
 {
     .tileTag = 2003,
     .paletteTag = 2003,
@@ -823,14 +883,14 @@ static const struct SpriteTemplate gUnknown_085E5030 =
     .anims = gUnknown_085E502C,
     .images = NULL,
     .affineAnims = gDummySpriteAffineAnimTable,
-    .callback = sub_8170040,
+    .callback = SpriteCB_IntroRayquazaHyperbeam,
 };
-static const struct CompressedSpriteSheet gUnknown_085E5048[] =
+static const struct CompressedSpriteSheet gIntroRayquazaGlowSpriteSheet[] =
 {
     {gIntro3MiscTiles, 0xA00, 2003},
     {NULL},
 };
-static const struct SpritePalette gUnknown_085E5058[] =
+static const struct SpritePalette gIntroRayquazaGlowPalette[] =
 {
     {gIntro3Misc1Palette, 2003},
     {NULL},
@@ -855,36 +915,36 @@ static void Task_IntroWaitToSetupPart3(u8);
 static void Task_IntroLoadPart3Graphics(u8);
 static void Task_IntroSpinAndZoomPokeball(u8);
 static void Task_IntroWaitToSetupPart3LegendsFight(u8);
-static void Task_IntroLoadPart1Graphics3(u8);
-static void Task_IntroLoadPart1Graphics4(u8);
-static void Task_IntroLoadPart1Graphics5(u8);
-static void Task_IntroLoadPart1Graphics6(u8);
-static void Task_IntroLoadPart1Graphics7(u8);
-static void Task_IntroLoadPart1Graphics8(u8);
-static void Task_IntroLoadPart1Graphics9(u8);
-static void Task_IntroFadeIn0(u8);
-static void Task_IntroFadeIn1(u8);
-static void Task_IntroFadeIn2(u8);
-static void Task_IntroFadeIn3(u8);
-static void Task_IntroFadeIn4(u8);
-static void Task_IntroFadeIn5(u8);
-static void Task_IntroFadeIn6(u8);
-static void Task_IntroFadeIn7(u8);
-static void Task_IntroFadeIn8(u8);
-static void Task_IntroFadeIn9(u8);
-static void sub_816E190(u8);
-static void sub_816E1F8(struct Sprite *);
-static void sub_816E6D4(u8);
-static void sub_816E74C(void);
-static void sub_816EEA8(u8);
+static void Task_IntroLoadGroudonScene(u8);
+static void Task_IntroLoadPart3Graphics1(u8);
+static void Task_IntroLoadPart3Graphics2(u8);
+static void Task_IntroLoadPart3Graphics3(u8);
+static void Task_IntroLoadPart3Graphics4(u8);
+static void Task_IntroGroudonScene(u8);
+static void Task_IntroLoadKyogreScene(u8);
+static void Task_IntroKyogreScene(u8);
+static void Task_IntroLoadClouds1(u8);
+static void Task_IntroLoadClouds2(u8);
+static void Task_IntroLoadClouds3(u8);
+static void Task_IntroCloudScene(u8);
+static void Task_IntroLoadRayquazaLightningScene(u8);
+static void Task_IntroRayquazaLightningScene(u8);
+static void Task_IntroLoadRayquazaGlowScene(u8);
+static void Task_IntroRayquazaGlowScene_0(u8);
+static void Task_EndIntroMovie(u8);
+static void CreateGroudonRockSprites(u8);
+static void SpriteCB_IntroGroudonRocks(struct Sprite *);
+static void CreateKyogreBubbleSprites_0(u8);
+static void CreateKyogreBubbleSprites_1(void);
+static void Task_IntroRayquazaGlowScene_1(u8);
 static void sub_816F46C(struct Sprite *);
 static void sub_816F5B4(struct Sprite *);
 static void sub_816F660(struct Sprite *);
 static void SpriteCB_WaterDropFall(struct Sprite *);
 static void sub_816F318(struct Sprite *);
-static void sub_816F9D4(struct Sprite *);
-static void sub_816FAB0(struct Sprite *);
-static u8 sub_816FDB8(s16, s16, s16);
+static void SpriteCB_IntroGraphicsBicycle(struct Sprite *);
+static void SpriteCB_IntroGraphicsFlygon(struct Sprite *);
+static u8 CreatePart1Animations(s16, s16, s16);
 
 static void VBlankCB_Intro(void)
 {
@@ -1006,10 +1066,10 @@ void CB2_InitCopyrightScreenAfterBootup(void)
     if (!SetUpCopyrightScreen())
     {
         SetSaveBlocksPointers(sub_815355C());
-        sub_808447C();
+        ResetMenuAndMonGlobals();
         Save_ResetSaveCounters();
         Save_LoadGameData(SAVE_NORMAL);
-        if (gSaveFileStatus == 0 || gSaveFileStatus == 2)
+        if (gSaveFileStatus == SAVE_STATUS_EMPTY || gSaveFileStatus == SAVE_STATUS_CORRUPT)
             Sav2_ClearSetDefault();
         SetPokemonCryStereo(gSaveBlock2Ptr->optionsSound);
         InitHeap(gHeap, HEAP_SIZE);
@@ -1024,31 +1084,31 @@ void CB2_InitCopyrightScreenAfterTitleScreen(void)
 static void Task_IntroLoadPart1Graphics(u8 taskId)
 {
     SetVBlankCallback(NULL);
-    gUnknown_0203BCC8 = Random() & 1;
+    gIntroCharacterGender = Random() & 1;
     intro_reset_and_hide_bgs();
     SetGpuReg(REG_OFFSET_BG3VOFS, 0);
     SetGpuReg(REG_OFFSET_BG2VOFS, 0x50);
     SetGpuReg(REG_OFFSET_BG1VOFS, 0x18);
     SetGpuReg(REG_OFFSET_BG0VOFS, 0x28);
     LZ77UnCompVram(gIntro1BGLeavesGfx, (void *)VRAM);
-    LZ77UnCompVram(gIntro1BG0_Tilemap, (void *)(VRAM + 0x8000));
-    DmaClear16(3, VRAM + 0x8800, 0x800);
-    LZ77UnCompVram(gIntro1BG1_Tilemap, (void *)(VRAM + 0x9000));
-    DmaClear16(3, VRAM + 0x9800, 0x800);
-    LZ77UnCompVram(gIntro1BG2_Tilemap, (void *)(VRAM + 0xA000));
-    DmaClear16(3, VRAM + 0xA800, 0x800);
-    LZ77UnCompVram(gIntro1BG3_Tilemap, (void *)(VRAM + 0xB000));
-    DmaClear16(3, VRAM + 0xB800, 0x800);
+    LZ77UnCompVram(gIntro1BG0_Tilemap, (void *)(BG_CHAR_ADDR(2)));
+    DmaClear16(3, BG_SCREEN_ADDR(17), 0x800);
+    LZ77UnCompVram(gIntro1BG1_Tilemap, (void *)(BG_SCREEN_ADDR(18)));
+    DmaClear16(3, BG_SCREEN_ADDR(19), 0x800);
+    LZ77UnCompVram(gIntro1BG2_Tilemap, (void *)(BG_SCREEN_ADDR(20)));
+    DmaClear16(3, BG_SCREEN_ADDR(21), 0x800);
+    LZ77UnCompVram(gIntro1BG3_Tilemap, (void *)(BG_SCREEN_ADDR(22)));
+    DmaClear16(3, BG_SCREEN_ADDR(23), 0x800);
     LoadPalette(gIntro1BGPals, 0, sizeof(gIntro1BGPals));
     SetGpuReg(REG_OFFSET_BG3CNT, BGCNT_PRIORITY(3) | BGCNT_CHARBASE(0) | BGCNT_SCREENBASE(22) | BGCNT_16COLOR | BGCNT_TXT256x512);
     SetGpuReg(REG_OFFSET_BG2CNT, BGCNT_PRIORITY(2) | BGCNT_CHARBASE(0) | BGCNT_SCREENBASE(20) | BGCNT_16COLOR | BGCNT_TXT256x512);
     SetGpuReg(REG_OFFSET_BG1CNT, BGCNT_PRIORITY(1) | BGCNT_CHARBASE(0) | BGCNT_SCREENBASE(18) | BGCNT_16COLOR | BGCNT_TXT256x512);
     SetGpuReg(REG_OFFSET_BG0CNT, BGCNT_PRIORITY(0) | BGCNT_CHARBASE(0) | BGCNT_SCREENBASE(16) | BGCNT_16COLOR | BGCNT_TXT256x512);
-    LoadCompressedObjectPic(gUnknown_085E4FDC);
-    LoadCompressedObjectPic(gUnknown_085E4FEC);
-    LoadSpritePalettes(gUnknown_085E4FFC);
-    LoadCompressedObjectPic(gUnknown_085E4A74);
-    LoadSpritePalettes(gUnknown_085E4A84);
+    LoadCompressedSpriteSheet(gIntroSpriteSheet_WaterDropAndLogo);
+    LoadCompressedSpriteSheet(gIntroSpriteSheet_Flygon);
+    LoadSpritePalettes(gIntroPalette_DropLogoFlygon);
+    LoadCompressedSpriteSheet(gIntroSpriteSheet_Sparkle);
+    LoadSpritePalettes(gIntroPalette_Lightning);
     CpuCopy16(gPlttBufferUnfaded + 0x100, gPlttBufferUnfaded + 0x1F0, 0x20);
     CpuCopy16(gPlttBufferUnfaded + 0x100, gPlttBufferUnfaded + 0x1E1, 0x1E);
     CpuCopy16(gPlttBufferUnfaded + 0x100, gPlttBufferUnfaded + 0x1D2, 0x1C);
@@ -1056,7 +1116,7 @@ static void Task_IntroLoadPart1Graphics(u8 taskId)
     CpuCopy16(gPlttBufferUnfaded + 0x100, gPlttBufferUnfaded + 0x1B4, 0x18);
     CpuCopy16(gPlttBufferUnfaded + 0x100, gPlttBufferUnfaded + 0x1A5, 0x16);
     CpuCopy16(gPlttBufferUnfaded + 0x100, gPlttBufferUnfaded + 0x196, 0x14);
-    sub_816FDB8(0x78, 0x50, 0);
+    CreatePart1Animations(0x78, 0x50, 0);
     gTasks[taskId].data[0] = CreateWaterDrop(236, -14, 0x200, 1, 0x78, FALSE);
     gTasks[taskId].func = Task_IntroFadeIn;
 }
@@ -1068,7 +1128,7 @@ static void Task_IntroFadeIn(u8 taskId)
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_0 | DISPCNT_OBJ_1D_MAP | DISPCNT_BG_ALL_ON | DISPCNT_OBJ_ON);
     gTasks[taskId].func = Task_IntroWaterDrops;
     gIntroFrameCounter = 0;
-    m4aSongNumStart(MUS_DEMO1);
+    m4aSongNumStart(MUS_INTRO);
     ResetSerial();
 }
 
@@ -1194,7 +1254,7 @@ static void Task_IntroLoadPart2Graphics(u8 taskId)
     FreeAllSpritePalettes();
     gUnknown_0203BD24 = 0;
     gUnknown_0203BD26 = 0;
-    gUnknown_0203BCCC = 0;
+    gIntroGraphicsFlygonYOffset = 0;
     load_intro_part2_graphics(1);
     gTasks[taskId].func = Task_IntroStartBikeRide;
 }
@@ -1203,39 +1263,39 @@ static void Task_IntroStartBikeRide(u8 taskId)
 {
     u8 spriteId;
 
-    if (gUnknown_0203BCC8 == 0)
-        LoadCompressedObjectPic(gIntro2BrendanSpriteSheet);
+    if (gIntroCharacterGender == 0)
+        LoadCompressedSpriteSheet(gIntro2BrendanSpriteSheet);
     else
-        LoadCompressedObjectPic(gIntro2MaySpriteSheet);
+        LoadCompressedSpriteSheet(gIntro2MaySpriteSheet);
 
-    LoadCompressedObjectPic(gIntro2BicycleSpriteSheet);
-    LoadCompressedObjectPic(gIntro2FlygonSpriteSheet);
+    LoadCompressedSpriteSheet(gIntro2BicycleSpriteSheet);
+    LoadCompressedSpriteSheet(gIntro2FlygonSpriteSheet);
 
     for (spriteId = 0; spriteId < 3; spriteId++)
     {
-        LoadCompressedObjectPic(&gUnknown_085E4AE8[spriteId]);
+        LoadCompressedSpriteSheet(&gIntroPokemonRunningSpriteSheet[spriteId]);
     }
 
-    LoadSpritePalettes(gUnknown_085F530C);
-    LoadSpritePalettes(gUnknown_085E4B08);
+    LoadSpritePalettes(gIntroBikeAndFlygonPalette);
+    LoadSpritePalettes(gIntroPokemonRunningPalette);
     CreateSprite(&gUnknown_085E4BDC, 0x110, 0x80, 0);
     CreateSprite(&gUnknown_085E4BA4, 0x120, 0x6E, 1);
 
-    if (gUnknown_0203BCC8 == 0)
+    if (gIntroCharacterGender == 0)
         spriteId = intro_create_brendan_sprite(0x110, 100);
     else
         spriteId = intro_create_may_sprite(0x110, 100);
 
-    gSprites[spriteId].callback = sub_816F9D4;
-    gSprites[spriteId].anims = gUnknown_085E4DC4;
+    gSprites[spriteId].callback = SpriteCB_IntroGraphicsBicycle;
+    gSprites[spriteId].anims = gIntroBicycleAnimationCommands;
     gTasks[taskId].data[1] = spriteId;
     CreateSprite(&gUnknown_085E4B40, 0x110, 0x50, 0x4);
     spriteId = intro_create_flygon_sprite(-0x40, 0x3C);
-    gSprites[spriteId].callback = sub_816FAB0;
+    gSprites[spriteId].callback = SpriteCB_IntroGraphicsFlygon;
     gTasks[taskId].data[2] = spriteId;
     BeginNormalPaletteFade(0xFFFFFFFF, 0, 16, 0, RGB_WHITEALPHA);
     SetVBlankCallback(VBlankCB_Intro);
-    gTasks[taskId].data[0] = sub_817B3DC(1, 0x4000, 0x400, 0x10);
+    gTasks[taskId].data[0] = CreateBicycleAnimationTask(1, 0x4000, 0x400, 0x10);
     sub_817B150(1);
     gTasks[taskId].func = Task_IntroHandleBikeAndFlygonMovement;
 }
@@ -1243,11 +1303,12 @@ static void Task_IntroStartBikeRide(u8 taskId)
 static void Task_IntroHandleBikeAndFlygonMovement(u8 taskId)
 {
     s16 a;
-    u16 sine;
+    u16 offset;
 
     if (gIntroFrameCounter == 1856)
     {
         gUnknown_0203BD28 = 2;
+        // Destroys the CreateBicycleAnimationTask created earlier.
         DestroyTask(gTasks[taskId].data[0]);
     }
     if (gIntroFrameCounter > 1946)
@@ -1268,8 +1329,8 @@ static void Task_IntroHandleBikeAndFlygonMovement(u8 taskId)
     if (gIntroFrameCounter == 1727)
         gSprites[gTasks[taskId].data[1]].data[0] = 4;
 
-    sine = Sin(gTasks[taskId].data[3] >> 2 & 0x7F, 48);
-    gUnknown_0203BCCC = sine;
+    offset = Sin(gTasks[taskId].data[3] >> 2 & 0x7F, 48);
+    gIntroGraphicsFlygonYOffset = offset;
     if (gTasks[taskId].data[3] < 512)
         gTasks[taskId].data[3]++;
     sub_817B540(0);
@@ -1487,13 +1548,13 @@ static void Task_IntroLoadPart3Graphics(u8 taskId)
 {
     intro_reset_and_hide_bgs();
     LZ77UnCompVram(gIntro3Pokeball_Gfx, (void *)VRAM);
-    LZ77UnCompVram(gIntro3Pokeball_Tilemap, (void *)(VRAM + 0x4000));
+    LZ77UnCompVram(gIntro3Pokeball_Tilemap, (void *)(BG_CHAR_ADDR(1)));
     LoadPalette(gIntro3PokeballPal, 0, 0x200);
     gTasks[taskId].data[0] = 0;
     gTasks[taskId].data[1] = 0;
     gTasks[taskId].data[2] = 0;
     gTasks[taskId].data[3] = 0;
-    sub_816F2A8(0x78, 0x50, 0, 0);
+    PanFadeAndZoomScreen(0x78, 0x50, 0, 0);
     ResetSpriteData();
     FreeAllSpritePalettes();
     BeginNormalPaletteFade(0xFFFFFFFF, 0, 0x10, 0, RGB_WHITEALPHA);
@@ -1501,7 +1562,7 @@ static void Task_IntroLoadPart3Graphics(u8 taskId)
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_1 | DISPCNT_OBJ_1D_MAP | DISPCNT_BG2_ON | DISPCNT_OBJ_ON);
     gTasks[taskId].func = Task_IntroSpinAndZoomPokeball;
     gIntroFrameCounter = 0;
-    m4aSongNumStart(MUS_T_BATTLE);
+    m4aSongNumStart(MUS_INTRO_BATTLE);
 }
 
 static void Task_IntroSpinAndZoomPokeball(u8 taskId)
@@ -1518,7 +1579,7 @@ static void Task_IntroSpinAndZoomPokeball(u8 taskId)
         gTasks[taskId].func = Task_IntroWaitToSetupPart3LegendsFight;
     }
 
-    sub_816F2A8(0x78, 0x50, 0x10000 / gTasks[taskId].data[1], gTasks[taskId].data[0]);
+    PanFadeAndZoomScreen(0x78, 0x50, 0x10000 / gTasks[taskId].data[1], gTasks[taskId].data[0]);
 
     if (gIntroFrameCounter == 28)
         BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, RGB_WHITEALPHA);
@@ -1527,10 +1588,10 @@ static void Task_IntroSpinAndZoomPokeball(u8 taskId)
 static void Task_IntroWaitToSetupPart3LegendsFight(u8 taskId)
 {
     if (gIntroFrameCounter > 43)
-        gTasks[taskId].func = Task_IntroLoadPart1Graphics3;
+        gTasks[taskId].func = Task_IntroLoadGroudonScene;
 }
 
-static void Task_IntroLoadPart1Graphics3(u8 taskId)
+static void Task_IntroLoadGroudonScene(u8 taskId)
 {
     if (!gPaletteFade.active)
     {
@@ -1539,17 +1600,17 @@ static void Task_IntroLoadPart1Graphics3(u8 taskId)
         FreeAllSpritePalettes();
         gReservedSpritePaletteCount = 8;
         LZDecompressVram(gIntro3GroudonGfx, (void *)VRAM);
-        LZDecompressVram(gIntro3GroudonTilemap, (void *)(VRAM + 0xC000));
-        LZDecompressVram(gIntro3LegendBgGfx, (void *)(VRAM + 0x4000));
-        LZDecompressVram(gIntro3GroudonBgTilemap, (void *)(VRAM + 0xE000));
-        LoadCompressedObjectPicUsingHeap(&gBattleAnimPicTable[GET_TRUE_SPRITE_INDEX(ANIM_TAG_ROCKS)]);
-        LoadCompressedObjectPaletteUsingHeap(&gBattleAnimPaletteTable[GET_TRUE_SPRITE_INDEX(ANIM_TAG_ROCKS)]);
+        LZDecompressVram(gIntro3GroudonTilemap, (void *)(BG_CHAR_ADDR(3)));
+        LZDecompressVram(gIntro3LegendBgGfx, (void *)(BG_CHAR_ADDR(1)));
+        LZDecompressVram(gIntro3GroudonBgTilemap, (void *)(BG_SCREEN_ADDR(28)));
+        LoadCompressedSpriteSheetUsingHeap(&gBattleAnimPicTable[GET_TRUE_SPRITE_INDEX(ANIM_TAG_ROCKS)]);
+        LoadCompressedSpritePaletteUsingHeap(&gBattleAnimPaletteTable[GET_TRUE_SPRITE_INDEX(ANIM_TAG_ROCKS)]);
         CpuCopy16(gIntro3BgPal, gPlttBufferUnfaded, sizeof(gIntro3BgPal));
-        gTasks[taskId].func = Task_IntroLoadPart1Graphics4;
+        gTasks[taskId].func = Task_IntroLoadPart3Graphics1;
     }
 }
 
-static void Task_IntroLoadPart1Graphics4(u8 taskId)
+static void Task_IntroLoadPart3Graphics1(u8 taskId)
 {
     SetGpuReg(REG_OFFSET_WIN0H, 0xF0);
     SetGpuReg(REG_OFFSET_WIN0V, 0xA0);
@@ -1577,11 +1638,11 @@ static void Task_IntroLoadPart1Graphics4(u8 taskId)
     gTasks[taskId].data[1] = 0xFFA0;
     gTasks[taskId].data[2] = 0xFF51;
     gTasks[taskId].data[3] = 0x100;
-    sub_816F2A8(0xFFA0, 0xFF51, 0x100, 0);
-    gTasks[taskId].func = Task_IntroLoadPart1Graphics5;
+    PanFadeAndZoomScreen(0xFFA0, 0xFF51, 0x100, 0);
+    gTasks[taskId].func = Task_IntroLoadPart3Graphics2;
 }
 
-static void Task_IntroLoadPart1Graphics5(u8 taskId)
+static void Task_IntroLoadPart3Graphics2(u8 taskId)
 {
     if (gTasks[taskId].data[0] != 32)
     {
@@ -1591,30 +1652,30 @@ static void Task_IntroLoadPart1Graphics5(u8 taskId)
     else
     {
         SetGpuReg(REG_OFFSET_WIN0V, 0x2080);
-        gTasks[taskId].func = Task_IntroLoadPart1Graphics6;
+        gTasks[taskId].func = Task_IntroLoadPart3Graphics3;
     }
 }
 
-static void Task_IntroLoadPart1Graphics6(u8 taskId)
+static void Task_IntroLoadPart3Graphics3(u8 taskId)
 {
-    gTasks[taskId].func = Task_IntroLoadPart1Graphics7;
+    gTasks[taskId].func = Task_IntroLoadPart3Graphics4;
 }
 
-static void Task_IntroLoadPart1Graphics7(u8 taskId)
+static void Task_IntroLoadPart3Graphics4(u8 taskId)
 {
     gTasks[taskId].data[0] = 0;
-    gTasks[taskId].func = Task_IntroLoadPart1Graphics8;
+    gTasks[taskId].func = Task_IntroGroudonScene;
     ScanlineEffect_InitWave(0, 0xA0, 0x4, 4, 1, 4, 0);
 }
 
-static void Task_IntroLoadPart1Graphics8(u8 taskId)
+static void Task_IntroGroudonScene(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
 
     data[5]++;
     if ((u16)(data[0] - 1) < 7 && data[5] % 2 == 0)
         data[4] ^= 3;
-    sub_816F2A8(data[1], data[2] + data[4], data[3], 0);
+    PanFadeAndZoomScreen(data[1], data[2] + data[4], data[3], 0);
     switch (data[0])
     {
     case 0:
@@ -1624,7 +1685,7 @@ static void Task_IntroLoadPart1Graphics8(u8 taskId)
             data[0]++;
             data[6] = 2;
             data[7] = 0x1E2;
-            sub_816E190(taskId);
+            CreateGroudonRockSprites(taskId);
         }
         break;
     case 1:
@@ -1706,30 +1767,30 @@ static void Task_IntroLoadPart1Graphics8(u8 taskId)
     case 9:
         if (!gPaletteFade.active)
         {
-            gTasks[taskId].func = Task_IntroLoadPart1Graphics9;
+            gTasks[taskId].func = Task_IntroLoadKyogreScene;
             gScanlineEffect.state = 3;
         }
         break;
     }
 }
 
-static void sub_816E190(u8 a0)
+static void CreateGroudonRockSprites(u8 a0)
 {
     int i;
     u8 spriteId;
 
     for (i = 0; i < 6; i++)
     {
-        spriteId = CreateSprite(gUnknown_08596C10, gUnknown_085E4C64[i][0], 0xA0, i);
-        gSprites[spriteId].callback = sub_816E1F8;
+        spriteId = CreateSprite(gAncientPowerRockSpriteTemplate, gIntroGroudonRockData[i][0], 0xA0, i);
+        gSprites[spriteId].callback = SpriteCB_IntroGroudonRocks;
         gSprites[spriteId].oam.priority = 0;
         gSprites[spriteId].data[1] = i;
         gSprites[spriteId].data[4] = a0;
-        StartSpriteAnim(&gSprites[spriteId], gUnknown_085E4C64[i][1]);
+        StartSpriteAnim(&gSprites[spriteId], gIntroGroudonRockData[i][1]);
     }
 }
 
-static void sub_816E1F8(struct Sprite *sprite)
+static void SpriteCB_IntroGroudonRocks(struct Sprite *sprite)
 {
     sprite->data[3]++;
     if (sprite->data[3] % 2 == 0)
@@ -1738,7 +1799,7 @@ static void sub_816E1F8(struct Sprite *sprite)
     switch(sprite->data[0])
     {
     case 0:
-        sprite->data[2] += gUnknown_085E4C64[sprite->data[1]][2];
+        sprite->data[2] += gIntroGroudonRockData[sprite->data[1]][2];
         sprite->pos1.y -= (sprite->data[2] & 0xFF00) >> 8;
         sprite->data[2] &= 0xFF;
         if (gTasks[sprite->data[4]].data[0] > 7)
@@ -1758,30 +1819,30 @@ static void sub_816E1F8(struct Sprite *sprite)
     }
 }
 
-static void Task_IntroLoadPart1Graphics9(u8 taskId)
+static void Task_IntroLoadKyogreScene(u8 taskId)
 {
     ResetSpriteData();
     LZDecompressVram(gIntro3KyogreGfx, (void *)VRAM);
-    LZDecompressVram(gIntro3KyogreTilemap, (void *)(VRAM + 0xC000));
-    LZDecompressVram(gIntro3KyogreBgTilemap, (void *)(VRAM + 0xE000));
-    LoadCompressedObjectPic(gUnknown_085E4C88);
+    LZDecompressVram(gIntro3KyogreTilemap, (void *)(BG_CHAR_ADDR(3)));
+    LZDecompressVram(gIntro3KyogreBgTilemap, (void *)(BG_SCREEN_ADDR(28)));
+    LoadCompressedSpriteSheet(gUnknown_085E4C88);
     LoadSpritePalette(gUnknown_085E4C98);
     BeginNormalPaletteFade(0xFFFFFFFE, 0, 0x10, 0, RGB_WHITEALPHA);
-    gTasks[taskId].func = Task_IntroFadeIn0;
+    gTasks[taskId].func = Task_IntroKyogreScene;
     gTasks[taskId].data[0] = 0;
     gTasks[taskId].data[1] = 0x150;
     gTasks[taskId].data[2] = 0x50;
     gTasks[taskId].data[6] = 0x10;
     gTasks[taskId].data[3] = 0x100;
-    sub_816F2A8(0x150, 0x50, 0x100, 0);
+    PanFadeAndZoomScreen(0x150, 0x50, 0x100, 0);
     ScanlineEffect_InitWave(0, 0xA0, 4, 4, 1, 6, 0);
 }
 
-static void Task_IntroFadeIn0(u8 taskId)
+static void Task_IntroKyogreScene(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
 
-    sub_816F2A8(data[1], data[2], data[3], 0);
+    PanFadeAndZoomScreen(data[1], data[2], data[3], 0);
 
     switch (data[0])
     {
@@ -1798,7 +1859,7 @@ static void Task_IntroFadeIn0(u8 taskId)
             data[6] = 0x19;
             data[7] = 1;
             data[0]++;
-            sub_816E6D4(0);
+            CreateKyogreBubbleSprites_0(0);
         }
         break;
     case 2:
@@ -1808,8 +1869,8 @@ static void Task_IntroFadeIn0(u8 taskId)
             gTasks[taskId].data[2] -= 0x102;
             data[6] = 8;
             data[0]++;
-            sub_816E6D4(0);
-            sub_816E74C();
+            CreateKyogreBubbleSprites_0(0);
+            CreateKyogreBubbleSprites_1();
         }
         break;
     case 3:
@@ -1891,7 +1952,7 @@ static void Task_IntroFadeIn0(u8 taskId)
         {
             data[6] = 0;
             data[0]++;
-            sub_816E6D4(taskId);
+            CreateKyogreBubbleSprites_0(taskId);
         }
         break;
     case 11:
@@ -1914,43 +1975,43 @@ static void Task_IntroFadeIn0(u8 taskId)
     case 13:
         if (!gPaletteFade.active)
         {
-            gTasks[taskId].func = Task_IntroFadeIn1;
+            gTasks[taskId].func = Task_IntroLoadClouds1;
             gScanlineEffect.state = 3;
         }
         break;
     }
 }
 
-static void sub_816E6D4(u8 a0)
+static void CreateKyogreBubbleSprites_0(u8 taskId)
 {
     int i;
     u8 spriteId;
 
     for (i = 0; i < 6; i++)
     {
-        spriteId = CreateSprite(&gUnknown_085E4D14, gUnknown_085E4CA8[i][0], gUnknown_085E4CA8[i][1], i);
+        spriteId = CreateSprite(&gUnknown_085E4D14, gIntroKyogreBubbleData[i][0], gIntroKyogreBubbleData[i][1], i);
         gSprites[spriteId].invisible = TRUE;
-        gSprites[spriteId].data[5] = a0;
-        gSprites[spriteId].data[6] = gUnknown_085E4CA8[i][2];
+        gSprites[spriteId].data[5] = taskId;
+        gSprites[spriteId].data[6] = gIntroKyogreBubbleData[i][2];
         gSprites[spriteId].data[7] = 0x40;
     }
 }
 
-static void sub_816E74C(void)
+static void CreateKyogreBubbleSprites_1(void)
 {
     int i;
     u8 spriteId;
 
     for (i = 0; i < 6; i++)
     {
-        spriteId = CreateSprite(&gUnknown_085E4D14, gUnknown_085E4CA8[i + 6][0], gUnknown_085E4CA8[i + 6][1], i);
+        spriteId = CreateSprite(&gUnknown_085E4D14, gIntroKyogreBubbleData[i + 6][0], gIntroKyogreBubbleData[i + 6][1], i);
         gSprites[spriteId].invisible = TRUE;
-        gSprites[spriteId].data[6] = gUnknown_085E4CA8[i][2];
+        gSprites[spriteId].data[6] = gIntroKyogreBubbleData[i][2];
         gSprites[spriteId].data[7] = 0x40;
     }
 }
 
-static void sub_816E7B4(struct Sprite *sprite)
+static void SpriteCB_IntroKyogreBubbles(struct Sprite *sprite)
 {
     switch(sprite->data[0])
     {
@@ -1988,7 +2049,7 @@ static void sub_816E7B4(struct Sprite *sprite)
     }
 }
 
-static void Task_IntroFadeIn1(u8 taskId)
+static void Task_IntroLoadClouds1(u8 taskId)
 {
     SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG0
                                | BLDCNT_TGT1_BG1
@@ -2025,29 +2086,29 @@ static void Task_IntroFadeIn1(u8 taskId)
     SetGpuReg(REG_OFFSET_BG2HOFS, 0);
     SetGpuReg(REG_OFFSET_BG2VOFS, 0);
     LZDecompressVram(gIntro3CloudsGfx, (void *)VRAM);
-    LZDecompressVram(gIntro3CloudsGfx, (void *)(VRAM + 0x4000));
-    LZDecompressVram(gIntro3Clouds3Tilemap, (void *)(VRAM + 0xE000));
-    gTasks[taskId].func = Task_IntroFadeIn2;
+    LZDecompressVram(gIntro3CloudsGfx, (void *)(BG_CHAR_ADDR(1)));
+    LZDecompressVram(gIntro3Clouds3Tilemap, (void *)(BG_SCREEN_ADDR(28)));
+    gTasks[taskId].func = Task_IntroLoadClouds2;
 }
 
-static void Task_IntroFadeIn2(u8 taskId)
+static void Task_IntroLoadClouds2(u8 taskId)
 {
-    LZDecompressVram(gIntro3Clouds1Tilemap, (void *)(VRAM + 0xC000));
-    LZDecompressVram(gIntro3Clouds2Tilemap, (void *)(VRAM + 0xD000));
-    gTasks[taskId].func = Task_IntroFadeIn3;
+    LZDecompressVram(gIntro3Clouds1Tilemap, (void *)(BG_CHAR_ADDR(3)));
+    LZDecompressVram(gIntro3Clouds2Tilemap, (void *)(BG_SCREEN_ADDR(26)));
+    gTasks[taskId].func = Task_IntroLoadClouds3;
 }
 
-static void Task_IntroFadeIn3(u8 taskId)
+static void Task_IntroLoadClouds3(u8 taskId)
 {
     SetGpuReg(REG_OFFSET_BLDCNT, 0);
     SetGpuReg(REG_OFFSET_BLDALPHA, 0);
     SetGpuReg(REG_OFFSET_BLDY, 0);
-    gTasks[taskId].func = Task_IntroFadeIn4;
+    gTasks[taskId].func = Task_IntroCloudScene;
     gTasks[taskId].data[0] = 0;
     gTasks[taskId].data[6] = 16;
 }
 
-static void Task_IntroFadeIn4(u8 taskId)
+static void Task_IntroCloudScene(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
 
@@ -2071,16 +2132,16 @@ static void Task_IntroFadeIn4(u8 taskId)
         if (data[6] != 0)
             data[6] -= 0x80;
         else if (!gPaletteFade.active)
-            gTasks[taskId].func = Task_IntroFadeIn5;
+            gTasks[taskId].func = Task_IntroLoadRayquazaLightningScene;
         break;
     }
 }
 
-static void Task_IntroFadeIn5(u8 taskId)
+static void Task_IntroLoadRayquazaLightningScene(u8 taskId)
 {
-    LZDecompressVram(gIntro3RayquazaTilemap, (void *)(VRAM + 0xE000));
-    LZDecompressVram(gIntro3Clouds4Tilemap, (void *)(VRAM + 0xC000));
-    LZDecompressVram(gIntro3RayquazaGfx, (void *)(VRAM + 0x4000));
+    LZDecompressVram(gIntro3RayquazaTilemap, (void *)(BG_SCREEN_ADDR(28)));
+    LZDecompressVram(gIntro3Clouds4Tilemap, (void *)(BG_CHAR_ADDR(3)));
+    LZDecompressVram(gIntro3RayquazaGfx, (void *)(BG_CHAR_ADDR(1)));
     LZDecompressVram(gIntro3Clouds2Gfx, (void *)VRAM);
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_0
                                 | DISPCNT_OBJ_1D_MAP
@@ -2088,15 +2149,15 @@ static void Task_IntroFadeIn5(u8 taskId)
                                 | DISPCNT_BG2_ON
                                 | DISPCNT_OBJ_ON
                                 | DISPCNT_WIN0_ON);
-    gTasks[taskId].func = Task_IntroFadeIn6;
+    gTasks[taskId].func = Task_IntroRayquazaLightningScene;
     gTasks[taskId].data[0] = 0;
     gTasks[taskId].data[6] = 1;
     gTasks[taskId].data[7] = 0;
-    LoadCompressedObjectPicUsingHeap(gUnknown_085E4BF4);
-    LoadSpritePalettes(gUnknown_085E4C04);
+    LoadCompressedSpriteSheetUsingHeap(gIntroRayquazaLightningSpriteSheet);
+    LoadSpritePalettes(gIntroRayquazaLightningPalette);
 }
 
-static void Task_IntroFadeIn6(u8 taskId)
+static void Task_IntroRayquazaLightningScene(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
     u8 spriteId;
@@ -2106,10 +2167,10 @@ static void Task_IntroFadeIn6(u8 taskId)
     case 0:
         if (--data[6] == 0)
         {
-            CreateSprite(&gUnknown_085E4C4C, 200, 48, 0);
-            spriteId = CreateSprite(&gUnknown_085E4C4C, 200, 80, 1);
+            CreateSprite(&gIntroLightningSprite, 200, 48, 0);
+            spriteId = CreateSprite(&gIntroLightningSprite, 200, 80, 1);
             StartSpriteAnim(&gSprites[spriteId], 1);
-            spriteId = CreateSprite(&gUnknown_085E4C4C, 200, 112, 2);
+            spriteId = CreateSprite(&gIntroLightningSprite, 200, 112, 2);
             StartSpriteAnim(&gSprites[spriteId], 2);
             data[0]++;
             data[6] = 72;
@@ -2118,10 +2179,10 @@ static void Task_IntroFadeIn6(u8 taskId)
     case 1:
         if (--data[6] == 0)
         {
-            CreateSprite(&gUnknown_085E4C4C, 40, 48, 0);
-            spriteId = CreateSprite(&gUnknown_085E4C4C, 40, 80, 1);
+            CreateSprite(&gIntroLightningSprite, 40, 48, 0);
+            spriteId = CreateSprite(&gIntroLightningSprite, 40, 80, 1);
             StartSpriteAnim(&gSprites[spriteId], 1);
-            spriteId = CreateSprite(&gUnknown_085E4C4C, 40, 112, 2);
+            spriteId = CreateSprite(&gIntroLightningSprite, 40, 112, 2);
             StartSpriteAnim(&gSprites[spriteId], 2);
             data[0]++;
             data[6] = 48;
@@ -2129,12 +2190,12 @@ static void Task_IntroFadeIn6(u8 taskId)
         break;
     case 2:
         if (--data[6] == 0)
-            gTasks[taskId].func = Task_IntroFadeIn7;
+            gTasks[taskId].func = Task_IntroLoadRayquazaGlowScene;
         break;
     }
 }
 
-static void sub_816EC6C(struct Sprite *sprite)
+static void SpriteCB_IntroRayquazaLightning(struct Sprite *sprite)
 {
     if (sprite->animEnded)
         sprite->invisible = TRUE;
@@ -2165,30 +2226,30 @@ static void sub_816EC6C(struct Sprite *sprite)
     }
 }
 
-static void Task_IntroFadeIn7(u8 taskId)
+static void Task_IntroLoadRayquazaGlowScene(u8 taskId)
 {
     u8 newTaskId;
 
-    LoadCompressedObjectPic(gUnknown_085E5048);
-    LoadSpritePalettes(gUnknown_085E5058);
+    LoadCompressedSpriteSheet(gIntroRayquazaGlowSpriteSheet);
+    LoadSpritePalettes(gIntroRayquazaGlowPalette);
     SetGpuReg(REG_OFFSET_DISPCNT, DISPCNT_MODE_0
                                 | DISPCNT_OBJ_1D_MAP
                                 | DISPCNT_BG0_ON
                                 | DISPCNT_BG2_ON
                                 | DISPCNT_OBJ_ON
                                 | DISPCNT_WIN0_ON);
-    gTasks[taskId].func = Task_IntroFadeIn8;
+    gTasks[taskId].func = Task_IntroRayquazaGlowScene_0;
     BeginNormalPaletteFade(0x0000FFDE, 0, 16, 0, RGB(9, 10, 10));
     gTasks[taskId].data[0] = 0;
     gTasks[taskId].data[1] = 0xA8;
     gTasks[taskId].data[2] = -0x10;
     gTasks[taskId].data[3] = -0x88;
     gTasks[taskId].data[4] = -0x10;
-    newTaskId = CreateTask(sub_816EEA8, 0);
+    newTaskId = CreateTask(Task_IntroRayquazaGlowScene_1, 0);
     gTasks[newTaskId].data[4] = taskId;
 }
 
-static void Task_IntroFadeIn8(u8 taskId)
+static void Task_IntroRayquazaGlowScene_0(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
 
@@ -2230,22 +2291,22 @@ static void Task_IntroFadeIn8(u8 taskId)
         break;
     case 3:
         if (--data[5] == 0)
-            gTasks[taskId].func = Task_IntroFadeIn9;
+            gTasks[taskId].func = Task_EndIntroMovie;
         break;
     }
 }
 
-static void Task_IntroFadeIn9(u8 taskId)
+static void Task_EndIntroMovie(u8 taskId)
 {
     DestroyTask(taskId);
     SetMainCallback2(MainCB2_EndIntro);
 }
 
-static void sub_816EEA8(u8 taskId)
+static void Task_IntroRayquazaGlowScene_1(u8 taskId)
 {
+    // Note: data[4] contains the taskId of Task_IntroRayquazaGlowScene_0
     u8 spriteId;
     s16 *data = gTasks[taskId].data;
-
     data[2]++;
 
     switch(data[0])
@@ -2292,8 +2353,8 @@ static void sub_816EEA8(u8 taskId)
             }
             if (data[1] == 6)
             {
-                spriteId = CreateSprite(&gUnknown_085E5030, 120, 88, 15);
-                PlaySE(SE_OP_BASYU);
+                spriteId = CreateSprite(&gIntroRayquazaHyperbeamSprite, 120, 88, 15);
+                PlaySE(SE_INTRO_BLAST);
                 gSprites[spriteId].invisible = TRUE;
                 gSprites[spriteId].data[3] = data[4];
                 data[0]++;
@@ -2365,7 +2426,7 @@ static void Task_IntroWaterDrops_1(u8 taskId)
                                    | BLDCNT_TGT2_BG3
                                    | BLDCNT_TGT2_OBJ
                                    | BLDCNT_TGT2_BD);
-        SetGpuReg(REG_OFFSET_BLDALPHA, gUnknown_0853FF70[31]);
+        SetGpuReg(REG_OFFSET_BLDALPHA, gIntroWaterDropAlphaBlend[31]);
         SetGpuReg(REG_OFFSET_BLDY, 0);
         gTasks[taskId].data[1] = 0x40;
         gTasks[taskId].data[0]++;
@@ -2377,11 +2438,11 @@ static void Task_IntroWaterDrops_1(u8 taskId)
 
             gTasks[taskId].data[1]--;
             tmp = gTasks[taskId].data[1] / 2;
-            SetGpuReg(REG_OFFSET_BLDALPHA, gUnknown_0853FF70[tmp]);
+            SetGpuReg(REG_OFFSET_BLDALPHA, gIntroWaterDropAlphaBlend[tmp]);
         }
         else
         {
-            SetGpuReg(REG_OFFSET_BLDALPHA, gUnknown_0853FF70[0]);
+            SetGpuReg(REG_OFFSET_BLDALPHA, gIntroWaterDropAlphaBlend[0]);
             gTasks[taskId].data[1] = 0x10;
             gTasks[taskId].data[0]++;
         }
@@ -2408,7 +2469,7 @@ static void Task_IntroWaterDrops_2(u8 taskId)
                                    | BLDCNT_TGT2_BG3
                                    | BLDCNT_TGT2_OBJ
                                    | BLDCNT_TGT2_BD);
-        SetGpuReg(REG_OFFSET_BLDALPHA, gUnknown_0853FF70[0]);
+        SetGpuReg(REG_OFFSET_BLDALPHA, gIntroWaterDropAlphaBlend[0]);
         SetGpuReg(REG_OFFSET_BLDY, 0);
         gTasks[taskId].data[1] = 0;
         gTasks[taskId].data[0]++;
@@ -2420,11 +2481,11 @@ static void Task_IntroWaterDrops_2(u8 taskId)
 
             gTasks[taskId].data[1]++;
             tmp = gTasks[taskId].data[1] / 2;
-            SetGpuReg(REG_OFFSET_BLDALPHA, gUnknown_0853FF70[tmp]);
+            SetGpuReg(REG_OFFSET_BLDALPHA, gIntroWaterDropAlphaBlend[tmp]);
         }
         else
         {
-            SetGpuReg(REG_OFFSET_BLDALPHA, gUnknown_0853FF70[31]);
+            SetGpuReg(REG_OFFSET_BLDALPHA, gIntroWaterDropAlphaBlend[31]);
             gTasks[taskId].data[1] = 0x10;
             gTasks[taskId].data[0]++;
         }
@@ -2445,15 +2506,15 @@ static void Task_IntroWaterDrops_2(u8 taskId)
     }
 }
 
-void sub_816F2A8(u16 scrX, u16 scrY, u16 zoom, u16 alpha)
+void PanFadeAndZoomScreen(u16 screenX, u16 screenY, u16 zoom, u16 alpha)
 {
     struct BgAffineSrcData src;
     struct BgAffineDstData dest;
 
     src.texX = 0x8000;
     src.texY = 0x8000;
-    src.scrX = scrX;
-    src.scrY = scrY;
+    src.scrX = screenX;
+    src.scrY = screenY;
     src.sx = zoom;
     src.sy = zoom;
     src.alpha = alpha;
@@ -2506,9 +2567,9 @@ static void sub_816F3A4(struct Sprite *sprite)
         sprite->data[2] = 1024;
         sprite->data[3] = 8 * (sprite->data[1] & 3);
         sprite->callback = sub_816F318;
-        sprite->oam.shape = 1;
-        sprite->oam.size = 3;
-        CalcCenterToCornerVec(sprite, 1, 3, 2);
+        sprite->oam.shape = SPRITE_SHAPE(64x32);
+        sprite->oam.size = SPRITE_SIZE(64x32);
+        CalcCenterToCornerVec(sprite, SPRITE_SHAPE(64x32), SPRITE_SIZE(64x32), ST_OAM_AFFINE_ERASE);
     }
     else
     {
@@ -2628,9 +2689,9 @@ static void SpriteCB_WaterDropFall(struct Sprite *sprite)
         sprite->data[2] = 1024;
         sprite->data[3] = 8 * (sprite->data[1] & 3);
         sprite->callback = sub_816F318;
-        sprite->oam.shape = 1;
-        sprite->oam.size = 3;
-        CalcCenterToCornerVec(sprite, 1, 3, 2);
+        sprite->oam.shape = SPRITE_SHAPE(64x32);
+        sprite->oam.size = SPRITE_SIZE(64x32);
+        CalcCenterToCornerVec(sprite, SPRITE_SHAPE(64x32), SPRITE_SIZE(64x32), ST_OAM_AFFINE_ERASE);
     }
 }
 
@@ -2651,9 +2712,9 @@ static void SpriteCB_WaterDropFall_2(struct Sprite *sprite)
         sprite->data[2] = 1024;
         sprite->data[3] = 8 * (sprite->data[1] & 3);
         sprite->callback = sub_816F318;
-        sprite->oam.shape = 1;
-        sprite->oam.size = 3;
-        CalcCenterToCornerVec(sprite, 1, 3, 2);
+        sprite->oam.shape = SPRITE_SHAPE(64x32);
+        sprite->oam.size = SPRITE_SIZE(64x32);
+        CalcCenterToCornerVec(sprite, SPRITE_SHAPE(64x32), SPRITE_SIZE(64x32), ST_OAM_AFFINE_ERASE);
     }
 }
 
@@ -2662,7 +2723,7 @@ static u8 CreateWaterDrop(s16 x, s16 y, u16 c, u16 d, u16 e, u8 fallImmediately)
     u8 spriteId;
     u8 oldSpriteId;
 
-    spriteId = CreateSprite(&gUnknown_085E4D64, x, y, 1);
+    spriteId = CreateSprite(&gIntroWaterDropSprite, x, y, 1);
     gSprites[spriteId].data[0] = 0;
     gSprites[spriteId].data[7] = 0;
     gSprites[spriteId].data[1] = d;
@@ -2670,9 +2731,9 @@ static u8 CreateWaterDrop(s16 x, s16 y, u16 c, u16 d, u16 e, u8 fallImmediately)
     gSprites[spriteId].data[3] = c;
     gSprites[spriteId].data[5] = e;
     gSprites[spriteId].data[6] = c;
-    gSprites[spriteId].oam.affineMode = 3;
+    gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_DOUBLE;
     gSprites[spriteId].oam.matrixNum = d;
-    CalcCenterToCornerVec(&gSprites[spriteId], 0, 2, 2);
+    CalcCenterToCornerVec(&gSprites[spriteId], SPRITE_SHAPE(32x32), SPRITE_SIZE(32x32), ST_OAM_AFFINE_ERASE);
     StartSpriteAnim(&gSprites[spriteId], 2);
     if (!fallImmediately)
         gSprites[spriteId].callback = sub_816F454;
@@ -2680,21 +2741,21 @@ static u8 CreateWaterDrop(s16 x, s16 y, u16 c, u16 d, u16 e, u8 fallImmediately)
         gSprites[spriteId].callback = SpriteCB_WaterDropFall_2;
     oldSpriteId = spriteId;
 
-    spriteId = CreateSprite(&gUnknown_085E4D64, x, y, 1);
+    spriteId = CreateSprite(&gIntroWaterDropSprite, x, y, 1);
     gSprites[spriteId].data[7] = oldSpriteId;
     gSprites[spriteId].data[1] = d + 1;
-    gSprites[spriteId].oam.affineMode = 3;
+    gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_DOUBLE;
     gSprites[spriteId].oam.matrixNum = d + 1;
-    CalcCenterToCornerVec(&gSprites[spriteId], 0, 2, 2);
+    CalcCenterToCornerVec(&gSprites[spriteId], SPRITE_SHAPE(32x32), SPRITE_SIZE(32x32), ST_OAM_AFFINE_ERASE);
     gSprites[spriteId].callback = sub_816F3A4;
 
-    spriteId = CreateSprite(&gUnknown_085E4D64, x, y, 1);
+    spriteId = CreateSprite(&gIntroWaterDropSprite, x, y, 1);
     gSprites[spriteId].data[7] = oldSpriteId;
     gSprites[spriteId].data[1] = d + 2;
     StartSpriteAnim(&gSprites[spriteId], 1);
-    gSprites[spriteId].oam.affineMode = 3;
+    gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_DOUBLE;
     gSprites[spriteId].oam.matrixNum = d + 2;
-    CalcCenterToCornerVec(&gSprites[spriteId], 0, 2, 2);
+    CalcCenterToCornerVec(&gSprites[spriteId], SPRITE_SHAPE(32x32), SPRITE_SIZE(32x32), ST_OAM_AFFINE_ERASE);
     gSprites[spriteId].callback = sub_816F3A4;
 
     SetOamMatrix(d, c + 32, 0, 0, c + 32);
@@ -2704,7 +2765,7 @@ static u8 CreateWaterDrop(s16 x, s16 y, u16 c, u16 d, u16 e, u8 fallImmediately)
     return oldSpriteId;
 }
 
-static void sub_816F9D4(struct Sprite *sprite)
+static void SpriteCB_IntroGraphicsBicycle(struct Sprite *sprite)
 {
     switch (sprite->data[0])
     {
@@ -2753,7 +2814,7 @@ static void sub_816F9D4(struct Sprite *sprite)
     }
 }
 
-static void sub_816FAB0(struct Sprite *sprite)
+static void SpriteCB_IntroGraphicsFlygon(struct Sprite *sprite)
 {
     switch (sprite->data[0])
     {
@@ -2776,7 +2837,7 @@ static void sub_816FAB0(struct Sprite *sprite)
             sprite->pos2.x -= 2;
         break;
     }
-    sprite->pos2.y = Sin((u8)sprite->data[1], 8) - gUnknown_0203BCCC;
+    sprite->pos2.y = Sin((u8)sprite->data[1], 8) - gIntroGraphicsFlygonYOffset;
     sprite->data[1] += 4;
 }
 
@@ -2853,7 +2914,7 @@ static void sub_816FB38(struct Sprite *sprite)
         if (gIntroFrameCounter == 0x110)
         {
             StartSpriteAffineAnim(sprite, 2);
-            sprite->oam.objMode = 1;
+            sprite->oam.objMode = ST_OAM_OBJ_BLEND;
             sprite->data[0]++;
         }
         break;
@@ -2896,7 +2957,7 @@ static void sub_816FD44(struct Sprite *sprite)
     }
 }
 
-static u8 sub_816FDB8(s16 a0, s16 a1, s16 a2)
+static u8 CreatePart1Animations(s16 a0, s16 a1, s16 a2)
 {
     u16 i;
     u8 spriteId;
@@ -2946,9 +3007,9 @@ static void sub_816FEDC(struct Sprite *sprite)
     {
     case 0:
     default:
-        sprite->oam.affineMode = 3;
+        sprite->oam.affineMode = ST_OAM_AFFINE_DOUBLE;
         sprite->oam.matrixNum = 1;
-        CalcCenterToCornerVec(sprite, 1, 3, 3);
+        CalcCenterToCornerVec(sprite, SPRITE_SHAPE(64x32), SPRITE_SIZE(64x32), ST_OAM_AFFINE_DOUBLE);
         sprite->invisible = FALSE;
         sprite->data[0] = 1;
         sprite->data[1] = 0x80;
@@ -2981,7 +3042,7 @@ static void sub_816FEDC(struct Sprite *sprite)
     }
 }
 
-static void sub_8170040(struct Sprite *sprite)
+static void SpriteCB_IntroRayquazaHyperbeam(struct Sprite *sprite)
 {
     u16 foo;
 
@@ -2992,9 +3053,9 @@ static void sub_8170040(struct Sprite *sprite)
     case 0:
     default:
         sprite->invisible = FALSE;
-        sprite->oam.affineMode = 3;
+        sprite->oam.affineMode = ST_OAM_AFFINE_DOUBLE;
         sprite->oam.matrixNum = 18;
-        CalcCenterToCornerVec(sprite, 0, 3, 3);
+        CalcCenterToCornerVec(sprite, SPRITE_SHAPE(64x64), SPRITE_SIZE(64x64), ST_OAM_AFFINE_DOUBLE);
         sprite->data[1] = 0;
         sprite->data[0] = 1;
         //fall through

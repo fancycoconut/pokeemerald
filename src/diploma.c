@@ -5,7 +5,7 @@
 #include "gpu_regs.h"
 #include "scanline_effect.h"
 #include "task.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "decompress.h"
 #include "bg.h"
 #include "window.h"
@@ -13,8 +13,8 @@
 #include "text.h"
 #include "overworld.h"
 #include "menu.h"
-
-extern bool16 sub_80C0944(void);
+#include "pokedex.h"
+#include "constants/rgb.h"
 
 extern const u8 gText_DexNational[];
 extern const u8 gText_DexHoenn[];
@@ -76,15 +76,15 @@ void CB2_ShowDiploma(void)
     sDiplomaTilemapPtr = malloc(0x1000);
     InitDiplomaBg();
     InitDiplomaWindow();
-    reset_temp_tile_data_buffers();
-    decompress_and_copy_tile_data_to_vram(1, &sDiplomaTiles, 0, 0, 0);
-    while (free_temp_tile_data_buffers_if_possible())
+    ResetTempTileDataBuffers();
+    DecompressAndCopyTileDataToVram(1, &sDiplomaTiles, 0, 0, 0);
+    while (FreeTempTileDataBuffersIfPossible())
         ;
     LZDecompressWram(sDiplomaTilemap, sDiplomaTilemapPtr);
     CopyBgTilemapBufferToVram(1);
     DisplayDiplomaText();
     BlendPalettes(-1, 16, 0);
-    BeginNormalPaletteFade(0xFFFFFFFF, 0, 16, 0, 0);
+    BeginNormalPaletteFade(0xFFFFFFFF, 0, 16, 0, RGB_BLACK);
     EnableInterrupts(1);
     SetVBlankCallback(VBlankCB);
     SetMainCallback2(MainCB2);
@@ -107,9 +107,9 @@ static void Task_DiplomaFadeIn(u8 taskId)
 
 static void Task_DiplomaWaitForKeyPress(u8 taskId)
 {
-    if (gMain.newKeys & (A_BUTTON | B_BUTTON))
+    if (JOY_NEW(A_BUTTON | B_BUTTON))
     {
-        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 16, 0);
+        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 16, RGB_BLACK);
         gTasks[taskId].func = Task_DiplomaFadeOut;
     }
 }
@@ -127,7 +127,7 @@ static void Task_DiplomaFadeOut(u8 taskId)
 
 static void DisplayDiplomaText(void)
 {
-    if (sub_80C0944())
+    if (HasAllMons())
     {
         SetGpuReg(REG_OFFSET_BG1HOFS, DISPCNT_BG0_ON);
         StringCopy(gStringVar1, gText_DexNational);
@@ -197,7 +197,7 @@ static void InitDiplomaWindow(void)
     InitWindows(sDiplomaWinTemplates);
     DeactivateAllTextPrinters();
     LoadPalette(gUnknown_0860F074, 0xF0, 0x20);
-    FillWindowPixelBuffer(0, 0);
+    FillWindowPixelBuffer(0, PIXEL_FILL(0));
     PutWindowTilemap(0);
 }
 

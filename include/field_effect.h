@@ -1,9 +1,7 @@
 #ifndef GUARD_FIELD_EFFECTS_H
 #define GUARD_FIELD_EFFECTS_H
 
-extern const struct CompressedSpritePalette gTrainerFrontPicPaletteTable[2];
 extern const struct SpritePalette gNewGameBirchObjectPaletteInfo;
-extern const struct CompressedSpriteSheet gTrainerFrontPicTable[2];
 extern const struct SpriteTemplate gNewGameBirchObjectTemplate;
 extern const struct OamData gNewGameBirchOamAttributes;
 
@@ -13,11 +11,12 @@ extern bool8 (*gFieldCallback2)(void);
 
 u32 FieldEffectStart(u8);
 bool8 FieldEffectActiveListContains(u8 id);
-void sub_80B69DC(void);
+void FieldEffectActiveListClear(void);
+void ReturnToFieldFromFlyMapSelect(void);
 u8 AddNewGameBirchObject(s16, s16, u8);
 void FieldEffectStop(struct Sprite *sprite, u8 id);
 u8 CreateTrainerSprite(u8 trainerSpriteID, s16 x, s16 y, u8 subpriority, u8 *buffer);
-void CreateTeleportFieldEffectTask(void);
+void FldEff_TeleportWarpOut(void);
 void FieldEffectActiveListRemove(u8 id);
 void MultiplyInvertedPaletteRGBComponents(u16, u8, u8, u8);
 void FieldEffectActiveListAdd(u8 id);
@@ -35,16 +34,17 @@ bool8 FieldEffectCmd_end(u8 **script, u32 *val);
 bool8 FieldEffectCmd_loadgfx_callnative(u8 **script, u32 *val);
 bool8 FieldEffectCmd_loadtiles_callnative(u8 **script, u32 *val);
 bool8 FieldEffectCmd_loadfadedpal_callnative(u8 **script, u32 *val);
+void FieldCB_FallWarpExit(void);
+void StartEscalatorWarp(u8 metatileBehavior, u8 priority);
+void StartLavaridgeGymB1FWarp(u8 priority);
+void StartLavaridgeGym1FWarp(u8 priority);
 
-void sub_80B9C28(s16*, u8);
-void sub_80B9C54(s16*, u8);
-void sub_80B9CDC(s16*, u8);
-
-void sub_80B7CAC(struct Sprite*);
-void sub_80B7A58(struct Sprite*);
+void SpriteCB_AshPuff(struct Sprite*);
+void SpriteCB_AshLaunch(struct Sprite*);
 
 void MultiplyPaletteRGBComponents(u16 i, u8 r, u8 g, u8 b);
 void FreeResourcesAndDestroySprite(struct Sprite *sprite, u8 spriteId);
 u8 CreateMonSprite_PicBox(u16 species, s16 x, s16 y, u8 subpriority);
+void StartEscapeRopeFieldEffect(void);
 
-#endif //GUARD_FIELD_EFFECTS_H
+#endif // GUARD_FIELD_EFFECTS_H

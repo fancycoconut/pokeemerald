@@ -33,7 +33,7 @@ void UpdateMirageRnd(u16 days)
     s32 rnd = GetMirageRnd();
     while (days)
     {
-        rnd = 1103515245 * rnd + 12345;
+        rnd = ISO_RANDOMIZE2(rnd);
         days--;
     }
     SetMirageRnd(rnd);
@@ -81,7 +81,7 @@ void UpdateShoalTideFlag(void)
         1, // 23
     };
 
-    if (is_map_type_1_2_3_5_or_6(GetLastUsedWarpMapType()))
+    if (IsMapTypeOutdoors(GetLastUsedWarpMapType()))
     {
         RtcCalcLocalTime();
         if (tide[gLocalTime.hours])

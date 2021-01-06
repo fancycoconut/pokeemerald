@@ -1,9 +1,16 @@
 #include "global.h"
 #include "event_data.h"
+#include "pokedex.h"
 
-#define TEMP_FLAGS_SIZE 0x4
-#define TEMP_UPPER_FLAGS_SIZE 0x8
-#define TEMP_VARS_SIZE 0x20
+#define NUM_SPECIAL_FLAGS (SPECIAL_FLAGS_END - SPECIAL_FLAGS_START + 1)
+#define NUM_TEMP_FLAGS    (TEMP_FLAGS_END - TEMP_FLAGS_START + 1)
+#define NUM_DAILY_FLAGS   (DAILY_FLAGS_END - DAILY_FLAGS_START + 1)
+#define NUM_TEMP_VARS     (TEMP_VARS_END - TEMP_VARS_START + 1)
+
+#define SPECIAL_FLAGS_SIZE  (NUM_SPECIAL_FLAGS / 8)  // 8 flags per byte
+#define TEMP_FLAGS_SIZE     (NUM_TEMP_FLAGS / 8)
+#define DAILY_FLAGS_SIZE    (NUM_DAILY_FLAGS / 8)
+#define TEMP_VARS_SIZE      (NUM_TEMP_VARS * 2)      // 1/2 var per byte
 
 EWRAM_DATA u16 gSpecialVar_0x8000 = 0;
 EWRAM_DATA u16 gSpecialVar_0x8001 = 0;
@@ -22,35 +29,32 @@ EWRAM_DATA u16 gSpecialVar_LastTalked = 0;
 EWRAM_DATA u16 gSpecialVar_Facing = 0;
 EWRAM_DATA u16 gSpecialVar_MonBoxId = 0;
 EWRAM_DATA u16 gSpecialVar_MonBoxPos = 0;
-EWRAM_DATA u16 gSpecialVar_0x8014 = 0;
-EWRAM_DATA static u8 gUnknown_020375FC[16] = {0};
+EWRAM_DATA u16 gSpecialVar_Unused_0x8014 = 0;
+EWRAM_DATA static u8 gSpecialFlags[SPECIAL_FLAGS_SIZE] = {0};
 
 extern u16 *const gSpecialVars[];
-
-extern void sub_80BB358(void);
 
 void InitEventData(void)
 {
     memset(gSaveBlock1Ptr->flags, 0, sizeof(gSaveBlock1Ptr->flags));
     memset(gSaveBlock1Ptr->vars, 0, sizeof(gSaveBlock1Ptr->vars));
-    memset(gUnknown_020375FC, 0, sizeof(gUnknown_020375FC));
+    memset(gSpecialFlags, 0, sizeof(gSpecialFlags));
 }
 
 void ClearTempFieldEventData(void)
 {
-    memset(gSaveBlock1Ptr->flags, 0, TEMP_FLAGS_SIZE);
-    memset(gSaveBlock1Ptr->vars, 0, TEMP_VARS_SIZE);
+    memset(gSaveBlock1Ptr->flags + (TEMP_FLAGS_START / 8), 0, TEMP_FLAGS_SIZE);
+    memset(gSaveBlock1Ptr->vars + ((TEMP_VARS_START - VARS_START) * 2), 0, TEMP_VARS_SIZE);
     FlagClear(FLAG_SYS_ENC_UP_ITEM);
     FlagClear(FLAG_SYS_ENC_DOWN_ITEM);
     FlagClear(FLAG_SYS_USE_STRENGTH);
     FlagClear(FLAG_SYS_CTRL_OBJ_DELETE);
-    FlagClear(FLAG_0x880);
+    FlagClear(FLAG_NURSE_UNION_ROOM_REMINDER);
 }
 
-// Probably had different flag splits at one point.
-void ClearUpperFlags(void)
+void ClearDailyFlags(void)
 {
-    memset(gSaveBlock1Ptr->flags + 0x124, 0, TEMP_UPPER_FLAGS_SIZE);
+    memset(gSaveBlock1Ptr->flags + (DAILY_FLAGS_START / 8), 0, DAILY_FLAGS_SIZE);
 }
 
 void DisableNationalPokedex(void)
@@ -67,9 +71,9 @@ void EnableNationalPokedex(void)
     gSaveBlock2Ptr->pokedex.nationalMagic = 0xDA;
     *nationalDexVar = 0x302;
     FlagSet(FLAG_SYS_NATIONAL_DEX);
-    gSaveBlock2Ptr->pokedex.unknown1 = 1;
+    gSaveBlock2Ptr->pokedex.mode = DEX_MODE_NATIONAL;
     gSaveBlock2Ptr->pokedex.order = 0;
-    sub_80BB358();
+    ResetPokedexScrollPositions();
 }
 
 bool32 IsNationalPokedexEnabled(void)
@@ -110,36 +114,36 @@ bool32 IsMysteryGiftEnabled(void)
     return FlagGet(FLAG_SYS_MYSTERY_GIFT_ENABLE);
 }
 
-void sub_809D4D8(void)
+void ClearMysteryEventFlags(void)
 {
     FlagClear(FLAG_MYSTERY_EVENT_DONE);
-    FlagClear(FLAG_0x1E5);
-    FlagClear(FLAG_0x1E6);
-    FlagClear(FLAG_0x1E7);
-    FlagClear(FLAG_0x1E8);
-    FlagClear(FLAG_0x1E9);
-    FlagClear(FLAG_0x1EA);
-    FlagClear(FLAG_0x1EB);
-    FlagClear(FLAG_0x1EC);
-    FlagClear(FLAG_0x1ED);
-    FlagClear(FLAG_0x1EE);
-    FlagClear(FLAG_0x1EF);
-    FlagClear(FLAG_0x1F0);
-    FlagClear(FLAG_0x1F1);
-    FlagClear(FLAG_0x1F2);
-    FlagClear(FLAG_0x1F3);
+    FlagClear(FLAG_MYSTERY_EVENT_1);
+    FlagClear(FLAG_MYSTERY_EVENT_2);
+    FlagClear(FLAG_MYSTERY_EVENT_3);
+    FlagClear(FLAG_MYSTERY_EVENT_4);
+    FlagClear(FLAG_MYSTERY_EVENT_5);
+    FlagClear(FLAG_MYSTERY_EVENT_6);
+    FlagClear(FLAG_MYSTERY_EVENT_7);
+    FlagClear(FLAG_MYSTERY_EVENT_8);
+    FlagClear(FLAG_MYSTERY_EVENT_9);
+    FlagClear(FLAG_MYSTERY_EVENT_10);
+    FlagClear(FLAG_MYSTERY_EVENT_11);
+    FlagClear(FLAG_MYSTERY_EVENT_12);
+    FlagClear(FLAG_MYSTERY_EVENT_13);
+    FlagClear(FLAG_MYSTERY_EVENT_14);
+    FlagClear(FLAG_MYSTERY_EVENT_15);
 }
 
-void sub_809D570(void)
+void ClearMysteryEventVars(void)
 {
     VarSet(VAR_EVENT_PICHU_SLOT, 0);
-    VarSet(VAR_0x40DE, 0);
-    VarSet(VAR_0x40DF, 0);
-    VarSet(VAR_0x40E0, 0);
-    VarSet(VAR_0x40E1, 0);
-    VarSet(VAR_0x40E2, 0);
-    VarSet(VAR_0x40E3, 0);
-    VarSet(VAR_0x40E4, 0);
+    VarSet(VAR_NEVER_READ_0x40DE, 0);
+    VarSet(VAR_NEVER_READ_0x40DF, 0);
+    VarSet(VAR_NEVER_READ_0x40E0, 0);
+    VarSet(VAR_NEVER_READ_0x40E1, 0);
+    VarSet(VAR_NEVER_READ_0x40E2, 0);
+    VarSet(VAR_NEVER_READ_0x40E3, 0);
+    VarSet(VAR_NEVER_READ_0x40E4, 0);
 }
 
 void DisableResetRTC(void)
@@ -189,7 +193,7 @@ bool8 VarSet(u16 id, u16 value)
     return TRUE;
 }
 
-u8 VarGetEventObjectGraphicsId(u8 id)
+u8 VarGetObjectEventGraphicsId(u8 id)
 {
     return VarGet(VAR_OBJ_GFX_ID_0 + id);
 }
@@ -201,7 +205,7 @@ u8 *GetFlagPointer(u16 id)
     else if (id < SPECIAL_FLAGS_START)
         return &gSaveBlock1Ptr->flags[id / 8];
     else
-        return &gUnknown_020375FC[(id - SPECIAL_FLAGS_START) / 8];
+        return &gSpecialFlags[(id - SPECIAL_FLAGS_START) / 8];
 }
 
 u8 FlagSet(u16 id)

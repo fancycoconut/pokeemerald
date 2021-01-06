@@ -8,7 +8,7 @@
 #include "trig.h"
 #include "decompress.h"
 #include "palette.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "strings.h"
 #include "sound.h"
 #include "constants/songs.h"
@@ -125,14 +125,14 @@ static const struct
 static const struct OamData sOamData_ScrollArrowIndicator =
 {
     .y = 0,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(16x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(16x16),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -186,8 +186,8 @@ static const struct Subsprite sSubsprite_RedOutline1 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 0,
     .priority = 0,
 };
@@ -196,8 +196,8 @@ static const struct Subsprite sSubsprite_RedOutline2 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 1,
     .priority = 0,
 };
@@ -206,8 +206,8 @@ static const struct Subsprite sSubsprite_RedOutline3 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 2,
     .priority = 0,
 };
@@ -216,8 +216,8 @@ static const struct Subsprite sSubsprite_RedOutline4 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 3,
     .priority = 0,
 };
@@ -226,8 +226,8 @@ static const struct Subsprite sSubsprite_RedOutline5 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 4,
     .priority = 0,
 };
@@ -236,8 +236,8 @@ static const struct Subsprite sSubsprite_RedOutline6 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 5,
     .priority = 0,
 };
@@ -246,8 +246,8 @@ static const struct Subsprite sSubsprite_RedOutline7 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 6,
     .priority = 0,
 };
@@ -256,8 +256,8 @@ static const struct Subsprite sSubsprite_RedOutline8 =
 {
     .x = 0,
     .y = 0,
-    .shape = 0,
-    .size = 0,
+    .shape = SPRITE_SHAPE(8x8),
+    .size = SPRITE_SIZE(8x8),
     .tileOffset = 7,
     .priority = 0,
 };
@@ -265,14 +265,14 @@ static const struct Subsprite sSubsprite_RedOutline8 =
 static const struct OamData sOamData_RedArrowCursor =
 {
     .y = 0,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(16x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(16x16),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -312,7 +312,7 @@ static void ListMenuDummyTask(u8 taskId)
 
 }
 
-s32 DoMysteryGiftListMenu(struct WindowTemplate *windowTemplate, struct ListMenuTemplate *listMenuTemplate, u8 arg2, u16 tileNum, u16 palNum)
+s32 DoMysteryGiftListMenu(const struct WindowTemplate *windowTemplate, const struct ListMenuTemplate *listMenuTemplate, u8 arg2, u16 tileNum, u16 palNum)
 {
     switch (sMysteryGiftLinkMenu.state)
     {
@@ -324,7 +324,7 @@ s32 DoMysteryGiftListMenu(struct WindowTemplate *windowTemplate, struct ListMenu
         case 2:
             LoadUserWindowBorderGfx(sMysteryGiftLinkMenu.windowId, tileNum, palNum);
         case 1:
-            sub_8098858(sMysteryGiftLinkMenu.windowId, tileNum, palNum / 16);
+            DrawTextBorderOuter(sMysteryGiftLinkMenu.windowId, tileNum, palNum / 16);
             break;
         }
         gMultiuseListMenuTemplate = *listMenuTemplate;
@@ -334,14 +334,14 @@ s32 DoMysteryGiftListMenu(struct WindowTemplate *windowTemplate, struct ListMenu
         sMysteryGiftLinkMenu.state = 1;
         break;
     case 1:
-        sMysteryGiftLinkMenu.currItemId = ListMenuHandleInputGetItemId(sMysteryGiftLinkMenu.listTaskId);
-        if (gMain.newKeys & A_BUTTON)
+        sMysteryGiftLinkMenu.currItemId = ListMenu_ProcessInput(sMysteryGiftLinkMenu.listTaskId);
+        if (JOY_NEW(A_BUTTON))
         {
             sMysteryGiftLinkMenu.state = 2;
         }
-        if (gMain.newKeys & B_BUTTON)
+        if (JOY_NEW(B_BUTTON))
         {
-            sMysteryGiftLinkMenu.currItemId = LIST_B_PRESSED;
+            sMysteryGiftLinkMenu.currItemId = LIST_CANCEL;
             sMysteryGiftLinkMenu.state = 2;
         }
         if (sMysteryGiftLinkMenu.state == 2)
@@ -355,11 +355,11 @@ s32 DoMysteryGiftListMenu(struct WindowTemplate *windowTemplate, struct ListMenu
                 switch (arg2)
                 {
                 case 0: // can never be reached, because of the if statement above
-                    sub_819746C(sMysteryGiftLinkMenu.windowId, FALSE);
+                    ClearStdWindowAndFrame(sMysteryGiftLinkMenu.windowId, FALSE);
                     break;
                 case 2:
                 case 1:
-                    sub_819746C(sMysteryGiftLinkMenu.windowId, FALSE);
+                    ClearStdWindowAndFrame(sMysteryGiftLinkMenu.windowId, FALSE);
                     break;
                 }
             }
@@ -406,24 +406,24 @@ u8 ListMenuInitInRect(struct ListMenuTemplate *listMenuTemplate, struct ListMenu
     return taskId;
 }
 
-s32 ListMenuHandleInputGetItemId(u8 listTaskId)
+s32 ListMenu_ProcessInput(u8 listTaskId)
 {
     struct ListMenu *list = (void*) gTasks[listTaskId].data;
 
-    if (gMain.newKeys & A_BUTTON)
+    if (JOY_NEW(A_BUTTON))
     {
         return list->template.items[list->scrollOffset + list->selectedRow].id;
     }
-    else if (gMain.newKeys & B_BUTTON)
+    else if (JOY_NEW(B_BUTTON))
     {
-        return LIST_B_PRESSED;
+        return LIST_CANCEL;
     }
-    else if (gMain.newAndRepeatedKeys & DPAD_UP)
+    else if (JOY_REPEAT(DPAD_UP))
     {
         ListMenuChangeSelection(list, TRUE, 1, FALSE);
         return LIST_NOTHING_CHOSEN;
     }
-    else if (gMain.newAndRepeatedKeys & DPAD_DOWN)
+    else if (JOY_REPEAT(DPAD_DOWN))
     {
         ListMenuChangeSelection(list, TRUE, 1, TRUE);
         return LIST_NOTHING_CHOSEN;
@@ -439,10 +439,12 @@ s32 ListMenuHandleInputGetItemId(u8 listTaskId)
             rightButton = FALSE;
             break;
         case LIST_MULTIPLE_SCROLL_DPAD:
+            // note: JOY_REPEAT won't match here
             leftButton = gMain.newAndRepeatedKeys & DPAD_LEFT;
             rightButton = gMain.newAndRepeatedKeys & DPAD_RIGHT;
             break;
         case LIST_MULTIPLE_SCROLL_L_R:
+            // same as above
             leftButton = gMain.newAndRepeatedKeys & L_BUTTON;
             rightButton = gMain.newAndRepeatedKeys & R_BUTTON;
             break;
@@ -486,7 +488,7 @@ void RedrawListMenu(u8 listTaskId)
 {
     struct ListMenu *list = (void*) gTasks[listTaskId].data;
 
-    FillWindowPixelBuffer(list->template.windowId, (list->template.fillValue << 4) | (list->template.fillValue));
+    FillWindowPixelBuffer(list->template.windowId, PIXEL_FILL(list->template.fillValue));
     ListMenuPrintEntries(list, list->scrollOffset, 0, list->template.maxShowed);
     ListMenuDrawCursor(list);
     CopyWindowToVram(list->template.windowId, 2);
@@ -584,7 +586,7 @@ static u8 ListMenuInitInternal(struct ListMenuTemplate *listMenuTemplate, u16 sc
     if (list->template.totalItems < list->template.maxShowed)
         list->template.maxShowed = list->template.totalItems;
 
-    FillWindowPixelBuffer(list->template.windowId, (list->template.fillValue << 4) | (list->template.fillValue));
+    FillWindowPixelBuffer(list->template.windowId, PIXEL_FILL(list->template.fillValue));
     ListMenuPrintEntries(list, list->scrollOffset, 0, list->template.maxShowed);
     ListMenuDrawCursor(list);
     ListMenuCallSelectionChangedCallback(list, TRUE);
@@ -698,7 +700,7 @@ static void ListMenuErasePrintedCursor(struct ListMenu *list, u16 selectedRow)
         u8 width  = GetMenuCursorDimensionByFont(list->template.fontId, 0);
         u8 height = GetMenuCursorDimensionByFont(list->template.fontId, 1);
         FillWindowPixelRect(list->template.windowId,
-                            (list->template.fillValue << 4) | (list->template.fillValue),
+                            PIXEL_FILL(list->template.fillValue),
                             list->template.cursor_X,
                             selectedRow * yMultiplier + list->template.upText_Y,
                             width,
@@ -795,7 +797,7 @@ static void ListMenuScroll(struct ListMenu *list, u8 count, bool8 movingDown)
 {
     if (count >= list->template.maxShowed)
     {
-        FillWindowPixelBuffer(list->template.windowId, (list->template.fillValue << 4) | (list->template.fillValue));
+        FillWindowPixelBuffer(list->template.windowId, PIXEL_FILL(list->template.fillValue));
         ListMenuPrintEntries(list, list->scrollOffset, 0, list->template.maxShowed);
     }
     else
@@ -806,26 +808,26 @@ static void ListMenuScroll(struct ListMenu *list, u8 count, bool8 movingDown)
         {
             u16 y, width, height;
 
-            ScrollWindow(list->template.windowId, 1, count * yMultiplier, (list->template.fillValue << 4) | (list->template.fillValue));
+            ScrollWindow(list->template.windowId, 1, count * yMultiplier, PIXEL_FILL(list->template.fillValue));
             ListMenuPrintEntries(list, list->scrollOffset, 0, count);
 
             y = (list->template.maxShowed * yMultiplier) + list->template.upText_Y;
             width = GetWindowAttribute(list->template.windowId, WINDOW_WIDTH) * 8;
             height = (GetWindowAttribute(list->template.windowId, WINDOW_HEIGHT) * 8) - y;
             FillWindowPixelRect(list->template.windowId,
-                                (list->template.fillValue << 4) | (list->template.fillValue),
+                                PIXEL_FILL(list->template.fillValue),
                                 0, y, width, height);
         }
         else
         {
             u16 width;
 
-            ScrollWindow(list->template.windowId, 0, count * yMultiplier, (list->template.fillValue << 4) | (list->template.fillValue));
+            ScrollWindow(list->template.windowId, 0, count * yMultiplier, PIXEL_FILL(list->template.fillValue));
             ListMenuPrintEntries(list, list->scrollOffset + (list->template.maxShowed - count), list->template.maxShowed - count, count);
 
             width = GetWindowAttribute(list->template.windowId, WINDOW_WIDTH) * 8;
             FillWindowPixelRect(list->template.windowId,
-                                (list->template.fillValue << 4) | (list->template.fillValue),
+                                PIXEL_FILL(list->template.fillValue),
                                 0, 0, width, list->template.upText_Y);
         }
     }
@@ -1074,7 +1076,7 @@ u8 AddScrollIndicatorArrowPair(const struct ScrollArrowsTemplate *arrowInfo, u16
     spriteSheet.data = sRedArrowOtherGfx;
     spriteSheet.size = 0x100;
     spriteSheet.tag = arrowInfo->tileTag;
-    LoadCompressedObjectPic(&spriteSheet);
+    LoadCompressedSpriteSheet(&spriteSheet);
 
     if (arrowInfo->palTag == SPRITE_INVALID_TAG)
     {
@@ -1282,7 +1284,7 @@ void ListMenuSetUpRedOutlineCursorSpriteOamTable(u16 rowWidth, u16 rowHeight, st
         {
             subsprites[id] = sSubsprite_RedOutline3;
             subsprites[id].x = i - 120;
-            subsprites[id].y = 136;
+            subsprites[id].y = -120;
             id++;
 
             subsprites[id] = sSubsprite_RedOutline6;
@@ -1320,7 +1322,7 @@ static u8 ListMenuAddRedOutlineCursorObject(struct CursorStruct *cursor)
     spriteSheet.data = sSelectorOutlineGfx;
     spriteSheet.size = 0x100;
     spriteSheet.tag = cursor->tileTag;
-    LoadCompressedObjectPic(&spriteSheet);
+    LoadCompressedSpriteSheet(&spriteSheet);
 
     if (cursor->palTag == SPRITE_INVALID_TAG)
     {
@@ -1405,7 +1407,7 @@ static u8 ListMenuAddRedArrowCursorObject(struct CursorStruct *cursor)
     spriteSheet.data = sRedArrowGfx;
     spriteSheet.size = 0x80;
     spriteSheet.tag = cursor->tileTag;
-    LoadCompressedObjectPic(&spriteSheet);
+    LoadCompressedSpriteSheet(&spriteSheet);
 
     if (cursor->palTag == SPRITE_INVALID_TAG)
     {

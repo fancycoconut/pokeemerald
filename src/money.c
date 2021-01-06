@@ -20,14 +20,14 @@ EWRAM_DATA static u8 sMoneyLabelSpriteId = 0;
 static const struct OamData sOamData_MoneyLabel =
 {
     .y = 0,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 1,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(32x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x16),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -154,7 +154,7 @@ void PrintMoneyAmount(u8 windowId, u8 x, u8 y, int amount, u8 speed)
 
 void PrintMoneyAmountInMoneyBoxWithBorder(u8 windowId, u16 tileStart, u8 pallete, int amount)
 {
-    SetWindowBorderStyle(windowId, FALSE, tileStart, pallete);
+    DrawStdFrameWithCustomTileAndPalette(windowId, FALSE, tileStart, pallete);
     PrintMoneyAmountInMoneyBox(windowId, amount, 0);
 }
 
@@ -169,7 +169,7 @@ void DrawMoneyBox(int amount, u8 x, u8 y)
 
     SetWindowTemplateFields(&template, 0, x + 1, y + 1, 10, 2, 15, 8);
     sMoneyBoxWindowId = AddWindow(&template);
-    FillWindowPixelBuffer(sMoneyBoxWindowId, 0);
+    FillWindowPixelBuffer(sMoneyBoxWindowId, PIXEL_FILL(0));
     PutWindowTilemap(sMoneyBoxWindowId);
     CopyWindowToVram(sMoneyBoxWindowId, 1);
     PrintMoneyAmountInMoneyBoxWithBorder(sMoneyBoxWindowId, 0x214, 14, amount);
@@ -179,15 +179,15 @@ void DrawMoneyBox(int amount, u8 x, u8 y)
 void HideMoneyBox(void)
 {
     RemoveMoneyLabelObject();
-    sub_8198070(sMoneyBoxWindowId, FALSE);
+    ClearStdWindowAndFrameToTransparent(sMoneyBoxWindowId, FALSE);
     CopyWindowToVram(sMoneyBoxWindowId, 2);
     RemoveWindow(sMoneyBoxWindowId);
 }
 
 void AddMoneyLabelObject(u16 x, u16 y)
 {
-    LoadCompressedObjectPic(&sSpriteSheet_MoneyLabel);
-    LoadCompressedObjectPalette(&sSpritePalette_MoneyLabel);
+    LoadCompressedSpriteSheet(&sSpriteSheet_MoneyLabel);
+    LoadCompressedSpritePalette(&sSpritePalette_MoneyLabel);
     sMoneyLabelSpriteId = CreateSprite(&sSpriteTemplate_MoneyLabel, x, y, 0);
 }
 

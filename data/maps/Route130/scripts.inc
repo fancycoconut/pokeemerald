@@ -1,13 +1,13 @@
 Route130_MapScripts:: @ 81F735F
-	map_script 3, Route130_MapScript1_1F7365
+	map_script MAP_SCRIPT_ON_TRANSITION, Route130_OnTransition
 	.byte 0
 
-Route130_MapScript1_1F7365: @ 81F7365
-	compare VAR_0x405E, 4
-	call_if 4, Route130_EventScript_1F73B5
+Route130_OnTransition: @ 81F7365
+	compare VAR_SOOTOPOLIS_CITY_STATE, 4
+	call_if_ge Route130_EventScript_CheckSetAbnormalWeather
 	specialvar VAR_RESULT, IsMirageIslandPresent
-	compare VAR_RESULT, 1
-	goto_eq Route130_EventScript_1F73B1
+	compare VAR_RESULT, TRUE
+	goto_if_eq Route130_EventScript_SetMirageIslandLayout
 	setflag FLAG_TEMP_11
 	setflag FLAG_TEMP_12
 	setflag FLAG_TEMP_13
@@ -23,30 +23,29 @@ Route130_MapScript1_1F7365: @ 81F7365
 	setflag FLAG_TEMP_1D
 	setflag FLAG_TEMP_1E
 	setflag FLAG_TEMP_1F
-	setmaplayoutindex 263
+	setmaplayoutindex LAYOUT_ROUTE130
 	end
 
-Route130_EventScript_1F73B1:: @ 81F73B1
-	setmaplayoutindex 46
+Route130_EventScript_SetMirageIslandLayout:: @ 81F73B1
+	setmaplayoutindex LAYOUT_ROUTE130_MIRAGE_ISLAND
 	end
 
-Route130_EventScript_1F73B5:: @ 81F73B5
-	checkflag FLAG_SYS_WEATHER_CTRL
-	call_if 1, Route130_EventScript_27207A
+Route130_EventScript_CheckSetAbnormalWeather:: @ 81F73B5
+	call_if_set FLAG_SYS_WEATHER_CTRL, Common_EventScript_SetAbnormalWeather
 	return
 
-Route130_EventScript_1F73BF:: @ 81F73BF
-	trainerbattle_single TRAINER_RODNEY, Route130_Text_2A328A, Route130_Text_2A32E6
-	msgbox Route130_Text_2A3300, MSGBOX_AUTOCLOSE
+Route130_EventScript_Rodney:: @ 81F73BF
+	trainerbattle_single TRAINER_RODNEY, Route130_Text_RodneyIntro, Route130_Text_RodneyDefeat
+	msgbox Route130_Text_RodneyPostBattle, MSGBOX_AUTOCLOSE
 	end
 
-Route130_EventScript_1F73D6:: @ 81F73D6
-	trainerbattle_single TRAINER_KATIE, Route130_Text_2A3363, Route130_Text_2A33AC
-	msgbox Route130_Text_2A33F5, MSGBOX_AUTOCLOSE
+Route130_EventScript_Katie:: @ 81F73D6
+	trainerbattle_single TRAINER_KATIE, Route130_Text_KatieIntro, Route130_Text_KatieDefeat
+	msgbox Route130_Text_KatiePostBattle, MSGBOX_AUTOCLOSE
 	end
 
-Route130_EventScript_1F73ED:: @ 81F73ED
-	trainerbattle_single TRAINER_SANTIAGO, Route130_Text_2A343A, Route130_Text_2A346D
-	msgbox Route130_Text_2A3494, MSGBOX_AUTOCLOSE
+Route130_EventScript_Santiago:: @ 81F73ED
+	trainerbattle_single TRAINER_SANTIAGO, Route130_Text_SantiagoIntro, Route130_Text_SantiagoDefeat
+	msgbox Route130_Text_SantiagoPostBattle, MSGBOX_AUTOCLOSE
 	end
 

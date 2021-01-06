@@ -1,19 +1,20 @@
 LavaridgeTown_PokemonCenter_2F_MapScripts:: @ 81FFC97
-	map_script 2, LavaridgeTown_PokemonCenter_2F_MapScript2_276C3B
-	map_script 4, LavaridgeTown_PokemonCenter_2F_MapScript2_276B6C
-	map_script 1, LavaridgeTown_PokemonCenter_2F_MapScript1_276BBE
-	map_script 3, LavaridgeTown_PokemonCenter_2F_MapScript1_276ACF
+	map_script MAP_SCRIPT_ON_FRAME_TABLE, CableClub_OnFrame
+	map_script MAP_SCRIPT_ON_WARP_INTO_MAP_TABLE, CableClub_OnWarp
+	map_script MAP_SCRIPT_ON_LOAD, CableClub_OnLoad
+	map_script MAP_SCRIPT_ON_TRANSITION, CableClub_OnTransition
 	.byte 0
 
-LavaridgeTown_PokemonCenter_2F_EventScript_1FFCAC:: @ 81FFCAC
-	call OldaleTown_PokemonCenter_2F_EventScript_276EB7
+@ The below 3 are unused and leftover from RS
+LavaridgeTown_PokemonCenter_2F_EventScript_Colosseum:: @ 81FFCAC
+	call CableClub_EventScript_Colosseum
 	end
 
-LavaridgeTown_PokemonCenter_2F_EventScript_1FFCB2:: @ 81FFCB2
-	call OldaleTown_PokemonCenter_2F_EventScript_2770B2
+LavaridgeTown_PokemonCenter_2F_EventScript_TradeCenter:: @ 81FFCB2
+	call CableClub_EventScript_TradeCenter
 	end
 
-LavaridgeTown_PokemonCenter_2F_EventScript_1FFCB8:: @ 81FFCB8
-	call OldaleTown_PokemonCenter_2F_EventScript_2771DB
+LavaridgeTown_PokemonCenter_2F_EventScript_RecordCorner:: @ 81FFCB8
+	call CableClub_EventScript_RecordCorner
 	end
 

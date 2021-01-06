@@ -1,26 +1,22 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_anim.h"
 #include "battle_controllers.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "pokemon.h"
+#include "trainer_hill.h"
+#include "party_menu.h"
 #include "event_data.h"
 #include "constants/abilities.h"
 #include "random.h"
 #include "battle_scripts.h"
-
-extern u8 gUnknown_0203CF00[];
-
-extern void sub_81D55D0(void);
-extern void sub_81D5694(void);
-extern u8 pokemon_order_func(u8);
-extern void sub_81B8FB0(u8, u8);
 
 void AllocateBattleResources(void)
 {
     gBattleResources = gBattleResources; // something dumb needed to match
 
     if (gBattleTypeFlags & BATTLE_TYPE_TRAINER_HILL)
-        sub_81D55D0();
+        InitTrainerHillBattleStruct();
 
     gBattleStruct = AllocZeroed(sizeof(*gBattleStruct));
 
@@ -29,7 +25,7 @@ void AllocateBattleResources(void)
     gBattleResources->flags = AllocZeroed(sizeof(*gBattleResources->flags));
     gBattleResources->battleScriptsStack = AllocZeroed(sizeof(*gBattleResources->battleScriptsStack));
     gBattleResources->battleCallbackStack = AllocZeroed(sizeof(*gBattleResources->battleCallbackStack));
-    gBattleResources->statsBeforeLvlUp = AllocZeroed(sizeof(*gBattleResources->statsBeforeLvlUp));
+    gBattleResources->beforeLvlUp = AllocZeroed(sizeof(*gBattleResources->beforeLvlUp));
     gBattleResources->ai = AllocZeroed(sizeof(*gBattleResources->ai));
     gBattleResources->battleHistory = AllocZeroed(sizeof(*gBattleResources->battleHistory));
     gBattleResources->AI_ScriptsStack = AllocZeroed(sizeof(*gBattleResources->AI_ScriptsStack));
@@ -42,7 +38,7 @@ void AllocateBattleResources(void)
 
     if (gBattleTypeFlags & BATTLE_TYPE_SECRET_BASE)
     {
-        u16 currSecretBaseId = VarGet(VAR_0x4054);
+        u16 currSecretBaseId = VarGet(VAR_CURRENT_SECRET_BASE);
         CreateSecretBaseEnemyParty(&gSaveBlock1Ptr->secretBases[currSecretBaseId]);
     }
 }
@@ -50,7 +46,7 @@ void AllocateBattleResources(void)
 void FreeBattleResources(void)
 {
     if (gBattleTypeFlags & BATTLE_TYPE_TRAINER_HILL)
-        sub_81D5694();
+        FreeTrainerHillBattleStruct();
 
     if (gBattleResources != NULL)
     {
@@ -60,7 +56,7 @@ void FreeBattleResources(void)
         FREE_AND_SET_NULL(gBattleResources->flags);
         FREE_AND_SET_NULL(gBattleResources->battleScriptsStack);
         FREE_AND_SET_NULL(gBattleResources->battleCallbackStack);
-        FREE_AND_SET_NULL(gBattleResources->statsBeforeLvlUp);
+        FREE_AND_SET_NULL(gBattleResources->beforeLvlUp);
         FREE_AND_SET_NULL(gBattleResources->ai);
         FREE_AND_SET_NULL(gBattleResources->battleHistory);
         FREE_AND_SET_NULL(gBattleResources->AI_ScriptsStack);
@@ -96,17 +92,17 @@ void AdjustFriendshipOnBattleFaint(u8 battlerId)
     if (gBattleMons[opposingBattlerId].level > gBattleMons[battlerId].level)
     {
         if (gBattleMons[opposingBattlerId].level - gBattleMons[battlerId].level > 29)
-            AdjustFriendship(&gPlayerParty[gBattlerPartyIndexes[battlerId]], 8);
+            AdjustFriendship(&gPlayerParty[gBattlerPartyIndexes[battlerId]], FRIENDSHIP_EVENT_FAINT_LARGE);
         else
-            AdjustFriendship(&gPlayerParty[gBattlerPartyIndexes[battlerId]], 6);
+            AdjustFriendship(&gPlayerParty[gBattlerPartyIndexes[battlerId]], FRIENDSHIP_EVENT_FAINT_SMALL);
     }
     else
     {
-        AdjustFriendship(&gPlayerParty[gBattlerPartyIndexes[battlerId]], 6);
+        AdjustFriendship(&gPlayerParty[gBattlerPartyIndexes[battlerId]], FRIENDSHIP_EVENT_FAINT_SMALL);
     }
 }
 
-void sub_80571DC(u8 battlerId, u8 arg1)
+void SwitchPartyOrderInGameMulti(u8 battlerId, u8 arg1)
 {
     if (GetBattlerSide(battlerId) != B_SIDE_OPPONENT)
     {
@@ -114,13 +110,13 @@ void sub_80571DC(u8 battlerId, u8 arg1)
 
         // gBattleStruct->field_60[0][i]
 
-        for (i = 0; i < 3; i++)
-            gUnknown_0203CF00[i] = *(0 * 3 + i + (u8*)(gBattleStruct->field_60));
+        for (i = 0; i < (int)ARRAY_COUNT(gBattlePartyCurrentOrder); i++)
+            gBattlePartyCurrentOrder[i] = *(0 * 3 + i + (u8*)(gBattleStruct->field_60));
 
-        sub_81B8FB0(pokemon_order_func(gBattlerPartyIndexes[battlerId]), pokemon_order_func(arg1));
+        SwitchPartyMonSlots(GetPartyIdFromBattlePartyId(gBattlerPartyIndexes[battlerId]), GetPartyIdFromBattlePartyId(arg1));
 
-        for (i = 0; i < 3; i++)
-            *(0 * 3 + i + (u8*)(gBattleStruct->field_60)) = gUnknown_0203CF00[i];
+        for (i = 0; i < (int)ARRAY_COUNT(gBattlePartyCurrentOrder); i++)
+            *(0 * 3 + i + (u8*)(gBattleStruct->field_60)) = gBattlePartyCurrentOrder[i];
     }
 }
 

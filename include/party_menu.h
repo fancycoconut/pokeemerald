@@ -1,74 +1,93 @@
 #ifndef GUARD_PARTY_MENU_H
 #define GUARD_PARTY_MENU_H
 
+#include "main.h"
 #include "task.h"
 
-enum
+// seems like the last two fields may have been left as all-purpose vars
+// and the second of the two just happens to only be used in one case
+struct PartyMenu
 {
-    AILMENT_NONE,
-    AILMENT_PSN,
-    AILMENT_PRZ,
-    AILMENT_SLP,
-    AILMENT_FRZ,
-    AILMENT_BRN
+    MainCallback exitCallback;
+    TaskFunc task;
+    u8 menuType:4;
+    u8 layout:2;
+    s8 slotId;
+    s8 slotId2;
+    u8 action;
+    u16 bagItem;
+    s16 data1;           // used variously as a moveId, counter, moveSlotId, or cursorPos
+    s16 learnMoveState;  // data2, used only as a learn move state
 };
 
-enum
-{
-    PARTY_CHOOSE_MON,
-    PARTY_MUST_CHOOSE_MON,
-    PARTY_CANT_SWITCH,
-    PARTY_USE_ITEM_ON,
-    PARTY_ABILITY_PREVENTS,
-    PARTY_GIVE_ITEM,
-};
+extern struct PartyMenu gPartyMenu;
+extern bool8 gPartyMenuUseExitCallback;
+extern u8 gSelectedMonPartyId;
+extern MainCallback gPostMenuFieldCallback;
+extern u8 gSelectedOrderFromParty[MAX_FRONTIER_PARTY_SIZE];
+extern u8 gBattlePartyCurrentOrder[PARTY_SIZE / 2];
 
-struct Struct203CEC8
-{
-    u8 filler[0x9];
-    s8 unk9;
-    s8 unkA;
-    u8 unkB;
-    u8 filler2[0x2];
-};
+extern void (*gItemUseCB)(u8, TaskFunc);
 
-extern struct Struct203CEC8 gUnknown_0203CEC8;
+extern const u16 gTutorMoves[];
 
-extern const u16 gUnknown_0861500C[];
-
-bool8 pokemon_has_move(struct Pokemon *, u16);
-void sub_81B58A8(void);
-void DoWallyTutorialBagMenu(void);
-u8 pokemon_ailments_get_primary(u32 status);
-u8 *GetMonNickname(struct Pokemon *mon, u8 *dst);
+void AnimatePartySlot(u8 slot, u8 animNum);
+bool8 IsMultiBattle(void);
 u8 GetCursorSelectionMonId(void);
+u8 GetPartyMenuType(void);
+void Task_HandleChooseMonInput(u8 taskId);
+u8* GetMonNickname(struct Pokemon *mon, u8 *dest);
+u8 DisplayPartyMenuMessage(const u8* str, bool8 keepOpen);
+bool8 IsPartyMenuTextPrinterActive(void);
+void PartyMenuModifyHP(u8 taskId, u8 slot, s8 hpIncrement, s16 HPDifference, TaskFunc task);
+u8 GetAilmentFromStatus(u32 status);
+u8 GetMonAilment(struct Pokemon *mon);
+void DisplayPartyMenuStdMessage(u32 stringId);
 bool8 FieldCallback_PrepareFadeInFromMenu(void);
-void sub_81B7F60(void);
-
-void sub_81B0FCC(u8 partyIdx, u8 a);
-void sub_81B1370(u8 taskId);
-void display_pokemon_menu_message(u8 windowId);
-void sub_81B1F18(u8 taskId, u8 pokemonIdx, s8 a, s16 hp, TaskFunc func);
-void sub_81B1B5C(void *a, u8 b);
-u8 sub_81B1BD4(void);
-void sub_81B8448(void);
-void sub_81B8518(u8 unused);
-u8 sub_81B1360(void);
-void sub_81B8904(u8 arg0, void (*callback)(void));
-void OpenPartyMenuInBattle(u8 caseId);
-u16 ItemIdToBattleMoveId(u16 itemId);
-u8 sub_81B205C(struct Pokemon* a);
-void sub_81B617C(void);
-u8 sub_81B6D14(u16 a);
-bool8 hm_add_c3_without_phase_2(void);
-
-extern void dp05_ether(u8, u16, TaskFunc);
-extern void dp05_pp_up(u8, u16, TaskFunc);
-extern void dp05_rare_candy(u8, u16, TaskFunc);
-
-extern void sub_81B67C8(u8, u16, TaskFunc);
-extern void sub_81B79E8(u8, u16, TaskFunc);
-extern void sub_81B6DC4(u8, u16, TaskFunc);
-extern void sub_81B7C74(u8, u16, TaskFunc);
+void CB2_ReturnToPartyMenuFromFlyMap(void);
+void LoadHeldItemIcons(void);
+void DrawHeldItemIconsForTrade(u8 *partyCounts, u8 *partySpriteIds, u8 whichParty);
+void CB2_ShowPartyMenuForItemUse(void);
+void ItemUseCB_Medicine(u8 taskId, TaskFunc task);
+void ItemUseCB_ReduceEV(u8 taskId, TaskFunc task);
+void ItemUseCB_PPRecovery(u8 taskId, TaskFunc task);
+void ItemUseCB_PPUp(u8 taskId, TaskFunc task);
+u16 ItemIdToBattleMoveId(u16 item);
+bool8 IsMoveHm(u16 move);
+bool8 MonKnowsMove(struct Pokemon *mon, u16 move);
+void ItemUseCB_TMHM(u8 taskId, TaskFunc task);
+void ItemUseCB_RareCandy(u8 taskId, TaskFunc task);
+void ItemUseCB_SacredAsh(u8 taskId, TaskFunc task);
+void ItemUseCB_EvolutionStone(u8 taskId, TaskFunc task);
+u8 GetItemEffectType(u16 item);
+void CB2_PartyMenuFromStartMenu(void);
+void CB2_ChooseMonToGiveItem(void);
+void ChooseMonToGiveMailFromMailbox(void);
+void InitChooseHalfPartyForBattle(u8 unused);
+void ClearSelectedPartyOrder(void);
+void ChooseMonForTradingBoard(u8 menuType, MainCallback callback);
+void ChooseMonForMoveTutor(void);
+void ChooseMonForWirelessMinigame(void);
+void OpenPartyMenuInBattle(u8 partyAction);
+void ChooseMonForInBattleItem(void);
+void BufferBattlePartyCurrentOrder(void);
+void BufferBattlePartyCurrentOrderBySide(u8 battlerId, u8 flankId);
+void SwitchPartyOrderLinkMulti(u8 battlerId, u8 slot, u8 arrayIndex);
+void SwitchPartyMonSlots(u8 slot, u8 slot2);
+u8 GetPartyIdFromBattlePartyId(u8 slot);
+void ShowPartyMenuToShowcaseMultiBattleParty(void);
+void ChooseMonForDaycare(void);
+bool8 CB2_FadeFromPartyMenu(void);
+void ChooseContestMon(void);
+void ChoosePartyMon(void);
+void ChooseMonForMoveRelearner(void);
+void BattlePyramidChooseMonHeldItems(void);
+void DoBattlePyramidMonsHaveHeldItem(void);
+void IsSelectedMonEgg(void);
+void IsLastMonThatKnowsSurf(void);
+void MoveDeleterForgetMove(void);
+void BufferMoveDeleterNicknameAndMove(void);
+void GetNumMovesSelectedMonHas(void);
+void MoveDeleterChooseMoveToForget(void);
 
 #endif // GUARD_PARTY_MENU_H

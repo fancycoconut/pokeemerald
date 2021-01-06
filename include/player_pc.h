@@ -1,6 +1,8 @@
 #ifndef GUARD_PLAYER_PC_H
 #define GUARD_PLAYER_PC_H
 
+#include "menu.h"
+
 // local task defines
 #define PAGE_INDEX data[0]
 #define ITEMS_ABOVE_TOP data[1]
@@ -84,5 +86,8 @@ extern const struct MenuAction gMailboxMailOptions[];
 
 void ReshowPlayerPC(u8 taskId);
 void sub_816B31C(void);
+void Mailbox_ReturnToMailListAfterDeposit(void);
+void NewGameInitPCItems(void);
+
 
 #endif //GUARD_PLAYER_PC_H

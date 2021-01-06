@@ -2,8 +2,13 @@
 #define GUARD_GLOBAL_H
 
 #include <string.h>
+#include <limits.h>
 #include "config.h" // we need to define config before gba headers as print stuff needs the functions nulled before defines.
 #include "gba/gba.h"
+#include "constants/global.h"
+#include "constants/flags.h"
+#include "constants/vars.h"
+#include "constants/species.h"
 
 // Prevent cross-jump optimization.
 #define BLOCK_CROSS_JUMP asm("");
@@ -17,15 +22,22 @@
 #if defined (__APPLE__) || defined (__CYGWIN__) || defined (_MSC_VER)
 #define _(x) x
 #define __(x) x
-#define INCBIN_U8 {0}
-#define INCBIN_U16 {0}
-#define INCBIN_U32 {0}
-#define INCBIN_S8 {0}
-#define INCBIN_S16 {0}
-#define INCBIN_S32 {0}
+
+// Fool CLion IDE
+#define INCBIN(x) {0}
+#define INCBIN_U8 INCBIN
+#define INCBIN_U16 INCBIN
+#define INCBIN_U32 INCBIN
+#define INCBIN_S8 INCBIN
+#define INCBIN_S16 INCBIN
+#define INCBIN_S32 INCBIN
 #endif // IDE support
 
 #define ARRAY_COUNT(array) (size_t)(sizeof(array) / sizeof((array)[0]))
+
+// GameFreak used a macro called "NELEMS", as evidenced by
+// AgbAssert calls.
+#define NELEMS(arr) (sizeof(arr)/sizeof(*(arr)))
 
 #define SWAP(a, b, temp)    \
 {                           \
@@ -43,7 +55,7 @@
 #define Q_4_12(n)  ((s16)((n) * 4096))
 
 // Converts a number to Q24.8 fixed-point format
-#define Q_24_8(n)  ((s32)((n) * 256))
+#define Q_24_8(n)  ((s32)((n) << 8))
 
 // Converts a Q8.8 fixed-point format number to a regular integer
 #define Q_8_8_TO_INT(n) ((int)((n) / 256))
@@ -54,12 +66,18 @@
 // Converts a Q24.8 fixed-point format number to a regular integer
 #define Q_24_8_TO_INT(n) ((int)((n) >> 8))
 
-#define PARTY_SIZE 6
-
-#define POKEMON_SLOTS_NUMBER 412
-
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) >= (b) ? (a) : (b))
+
+#if MODERN
+#define abs(x) (((x) < 0) ? -(x) : (x))
+#endif
+
+// Extracts the upper 16 bits of a 32-bit number
+#define HIHALF(n) (((n) & 0xFFFF0000) >> 16)
+
+// Extracts the lower 16 bits of a 32-bit number
+#define LOHALF(n) ((n) & 0xFFFF)
 
 // There are many quirks in the source code which have overarching behavioral differences from
 // a number of other files. For example, diploma.c seems to declare rodata before each use while
@@ -79,6 +97,13 @@
 #define T2_READ_32(ptr) ((ptr)[0] + ((ptr)[1] << 8) + ((ptr)[2] << 16) + ((ptr)[3] << 24))
 #define T2_READ_PTR(ptr) (void*) T2_READ_32(ptr)
 
+// Macros for checking the joypad
+#define TEST_BUTTON(field, button) ({(field) & (button);})
+#define JOY_NEW(button) TEST_BUTTON(gMain.newKeys,  button)
+#define JOY_HELD(button)  TEST_BUTTON(gMain.heldKeys, button)
+#define JOY_HELD_RAW(button) TEST_BUTTON(gMain.heldKeysRaw, button)
+#define JOY_REPEAT(button) TEST_BUTTON(gMain.newAndRepeatedKeys, button)
+
 #define S16TOPOSFLOAT(val)   \
 ({                           \
     s16 v = (val);           \
@@ -87,99 +112,10 @@
     f;                       \
 })
 
-// Invalid Versions show as "----------" in Gen 4 and Gen 5's summary screen.
-// In Gens 6 and 7, invalid versions instead show "a distant land" in the summary screen.
-// In Gen 4 only, migrated Pokemon with Diamond, Pearl, or Platinum's ID show as "----------".
-// Gen 5 and up read Diamond, Pearl, or Platinum's ID as "Sinnoh".
-// In Gen 4 and up, migrated Pokemon with HeartGold or SoulSilver's ID show the otherwise unused "Johto" string.
-enum
-{
-    VERSION_SAPPHIRE = 1,
-    VERSION_RUBY = 2,
-    VERSION_EMERALD = 3,
-    VERSION_FIRE_RED = 4,
-    VERSION_LEAF_GREEN = 5,
-    VERSION_HEART_GOLD = 7,
-    VERSION_SOUL_SILVER = 8,
-    VERSION_DIAMOND = 10,
-    VERSION_PEARL = 11,
-    VERSION_PLATINUM = 12,
-    VERSION_GAMECUBE = 15,
-};
+#define ROUND_BITS_TO_BYTES(numBits)(((numBits) / 8) + (((numBits) % 8) ? 1 : 0))
 
-enum LanguageId
-{
-    LANGUAGE_JAPANESE = 1,
-    LANGUAGE_ENGLISH = 2,
-    LANGUAGE_FRENCH = 3,
-    LANGUAGE_ITALIAN = 4,
-    LANGUAGE_GERMAN = 5,
-    // 6 goes unused but the theory is it was meant to be Korean
-    LANGUAGE_SPANISH = 7,
-};
-
-#define GAME_VERSION (VERSION_EMERALD)
-#define GAME_LANGUAGE (LANGUAGE_ENGLISH)
-
-// capacities of various saveblock objects
-#define DAYCARE_MON_COUNT     2
-#define POKEBLOCKS_COUNT     40
-#define EVENT_OBJECTS_COUNT  16
-#define BERRY_TREES_COUNT   128
-#define FLAGS_COUNT         300
-#define VARS_COUNT          256
-#define MAIL_COUNT           16
-#define SECRET_BASES_COUNT   20
-#define TV_SHOWS_COUNT       25
-#define POKE_NEWS_COUNT      16
-#define PC_ITEMS_COUNT       50
-#define BAG_ITEMS_COUNT      30
-#define BAG_KEYITEMS_COUNT   30
-#define BAG_POKEBALLS_COUNT  16
-#define BAG_TMHM_COUNT       64
-#define BAG_BERRIES_COUNT    46
-#define EVENT_OBJECT_TEMPLATES_COUNT 64
-
-#define PYRAMID_BAG_ITEMS_COUNT 10
-#define HALL_FACILITIES_COUNT 9 // 7 facilities for single mode + tower double mode + tower multi mode.
-
-// string lengths
-#define ITEM_NAME_LENGTH    14
-#define POKEMON_NAME_LENGTH 10
-#define PLAYER_NAME_LENGTH  7
-#define MAIL_WORDS_COUNT    9
-
-enum
-{
-    MALE,
-    FEMALE
-};
-
-enum
-{
-    OPTIONS_BUTTON_MODE_NORMAL,
-    OPTIONS_BUTTON_MODE_LR,
-    OPTIONS_BUTTON_MODE_L_EQUALS_A
-};
-
-enum
-{
-    OPTIONS_TEXT_SPEED_SLOW,
-    OPTIONS_TEXT_SPEED_MID,
-    OPTIONS_TEXT_SPEED_FAST
-};
-
-enum
-{
-    OPTIONS_SOUND_MONO,
-    OPTIONS_SOUND_STEREO
-};
-
-enum
-{
-    OPTIONS_BATTLE_STYLE_SHIFT,
-    OPTIONS_BATTLE_STYLE_SET
-};
+#define DEX_FLAGS_NO (ROUND_BITS_TO_BYTES(NUM_SPECIES))
+#define NUM_FLAG_BYTES (ROUND_BITS_TO_BYTES(FLAGS_COUNT))
 
 struct Coords8
 {
@@ -225,12 +161,10 @@ struct Time
     /*0x04*/ s8 seconds;
 };
 
-#define DEX_FLAGS_NO ((POKEMON_SLOTS_NUMBER / 8) + ((POKEMON_SLOTS_NUMBER % 8) ? 1 : 0))
-
 struct Pokedex
 {
     /*0x00*/ u8 order;
-    /*0x01*/ u8 unknown1;
+    /*0x01*/ u8 mode;
     /*0x02*/ u8 nationalMagic; // must equal 0xDA in order to have National mode
     /*0x03*/ u8 unknown2;
     /*0x04*/ u32 unownPersonality; // set when you first see Unown
@@ -240,18 +174,17 @@ struct Pokedex
     /*0x44*/ u8 seen[DEX_FLAGS_NO];
 };
 
-struct PokemonJumpResults // possibly used in the game itself?
+struct PokemonJumpResults
 {
     u16 jumpsInRow;
     u16 field2;
     u16 excellentsInRow;
     u16 field6;
-    u16 field8;
-    u16 fieldA;
+    u32 field8;
     u32 bestJumpScore;
 };
 
-struct BerryPickingResults // possibly used in the game itself? Size may be wrong as well
+struct BerryPickingResults
 {
     u32 bestScore;
     u16 berriesPicked;
@@ -283,29 +216,31 @@ struct BerryCrush
 struct ApprenticeMon
 {
     u16 species;
-    u16 moves[4];
+    u16 moves[MAX_MON_MOVES];
     u16 item;
 };
 
+// This is for past players Apprentices or Apprentices received via Record Mix.
+// For the current Apprentice, see struct PlayersApprentice
 struct Apprentice
 {
     u8 id:5;
     u8 lvlMode:2; // + 1
-    u8 field_1;
+    u8 numQuestions;
     u8 number;
-    struct ApprenticeMon party[3];
-    u16 easyChatWords[6];
-    u8 playerId[4];
+    struct ApprenticeMon party[MULTI_PARTY_SIZE];
+    u16 speechWon[EASY_CHAT_BATTLE_WORDS_COUNT];
+    u8 playerId[TRAINER_ID_LENGTH];
     u8 playerName[PLAYER_NAME_LENGTH];
     u8 language;
     u32 checksum;
 };
 
-struct UnknownPokemonStruct
+struct BattleTowerPokemon
 {
     u16 species;
     u16 heldItem;
-    u16 moves[4];
+    u16 moves[MAX_MON_MOVES];
     u8 level;
     u8 ppBonuses;
     u8 hpEV;
@@ -322,11 +257,13 @@ struct UnknownPokemonStruct
     u32 spAttackIV:5;
     u32 spDefenseIV:5;
     u32 gap:1;
-    u32 altAbility:1;
+    u32 abilityNum:1;
     u32 personality;
     u8 nickname[POKEMON_NAME_LENGTH + 1];
     u8 friendship;
 };
+
+#define NULL_BATTLE_TOWER_POKEMON { .nickname = __("$$$$$$$$$$$") }
 
 struct EmeraldBattleTowerRecord
 {
@@ -334,13 +271,22 @@ struct EmeraldBattleTowerRecord
     /*0x01*/ u8 facilityClass;
     /*0x02*/ u16 winStreak;
     /*0x04*/ u8 name[PLAYER_NAME_LENGTH + 1];
-    /*0x0C*/ u8 trainerId[4];
-    /*0x10*/ u16 greeting[6];
-    /*0x1C*/ u16 speechWon[6];
-    /*0x28*/ u16 speechLost[6];
-    /*0x34*/ struct UnknownPokemonStruct party[4];
+    /*0x0C*/ u8 trainerId[TRAINER_ID_LENGTH];
+    /*0x10*/ u16 greeting[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x1C*/ u16 speechWon[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x28*/ u16 speechLost[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x34*/ struct BattleTowerPokemon party[MAX_FRONTIER_PARTY_SIZE];
     /*0xE4*/ u8 language;
     /*0xE8*/ u32 checksum;
+};
+
+struct BattleTowerInterview
+{
+    u16 playerSpecies;
+    u16 opponentSpecies;
+    u8 opponentName[PLAYER_NAME_LENGTH + 1];
+    u8 opponentMonNickname[POKEMON_NAME_LENGTH + 1];
+    u8 opponentLanguage;
 };
 
 struct BattleTowerEReaderTrainer
@@ -349,27 +295,28 @@ struct BattleTowerEReaderTrainer
     /*0x01*/ u8 facilityClass;
     /*0x02*/ u16 winStreak;
     /*0x04*/ u8 name[PLAYER_NAME_LENGTH + 1];
-    /*0x0C*/ u8 trainerId[4];
-    /*0x10*/ u16 greeting[6];
-    /*0x1C*/ u16 farewellPlayerLost[6];
-    /*0x28*/ u16 farewellPlayerWon[6];
-    /*0x34*/ struct UnknownPokemonStruct party[3];
+    /*0x0C*/ u8 trainerId[TRAINER_ID_LENGTH];
+    /*0x10*/ u16 greeting[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x1C*/ u16 farewellPlayerLost[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x28*/ u16 farewellPlayerWon[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x34*/ struct BattleTowerPokemon party[FRONTIER_PARTY_SIZE];
     /*0xB8*/ u32 checksum;
 };
 
-struct FrontierMonData
+// For displaying party information on the player's Battle Dome tourney page 
+struct DomeMonData
 {
-    u16 moves[4];
-    u8 evs[6];
+    u16 moves[MAX_MON_MOVES];
+    u8 evs[NUM_STATS];
     u8 nature;
 };
 
-struct Struct_field_E70
+struct RentalMon
 {
     u16 monId;
     u32 personality;
     u8 ivs;
-    u8 abilityBit;
+    u8 abilityNum;
 };
 
 struct BattleDomeTrainer
@@ -377,125 +324,118 @@ struct BattleDomeTrainer
     u16 trainerId:10;
     u16 isEliminated:1;
     u16 eliminatedAt:2;
-    u16 unk3:3;
+    u16 forfeited:3;
 };
 
 #define DOME_TOURNAMENT_TRAINERS_COUNT 16
+#define BATTLE_TOWER_RECORD_COUNT 5
 
 struct BattleFrontier
 {
     /*0x64C*/ struct EmeraldBattleTowerRecord towerPlayer;
-    /*0x738*/ struct EmeraldBattleTowerRecord towerRecords[5]; // From record mixing.
-    /*0xBD4*/ u16 field_BD4;
-    /*0xBD6*/ u16 field_BD6;
-    /*0xBD8*/ u8 field_BD8[PLAYER_NAME_LENGTH + 1];
-    /*0xBE3*/ u8 field_BE0[POKEMON_NAME_LENGTH + 1];
-    /*0xBEB*/ u8 field_BEB;
+    /*0x738*/ struct EmeraldBattleTowerRecord towerRecords[BATTLE_TOWER_RECORD_COUNT]; // From record mixing.
+    /*0xBEB*/ struct BattleTowerInterview towerInterview;
     /*0xBEC*/ struct BattleTowerEReaderTrainer ereaderTrainer;
-    /*0xCA8*/ u8 field_CA8;
-    /*0xCA9*/ u8 lvlMode:2; // 0x1, 0x2 -> 0x3
-    /*0xCA9*/ u8 field_CA9_a:1;   // 0x4
-    /*0xCA9*/ u8 field_CA9_b:1;   // 0x8
-    /*0xCA9*/ u8 field_CA9_c:1;   // 0x10
-    /*0xCA9*/ u8 field_CA9_d:1;   // 0x20
-    /*0xCA9*/ u8 field_CA9_e:1;   // 0x40
-    /*0xCA9*/ u8 field_CA9_f:1;   // 0x80
-    /*0xCAA*/ u16 selectedPartyMons[3];
-    /*0xCB0*/ u16 field_CB0;
-    /*0xCB2*/ u16 curChallengeBattleNum; // In case of battle pyramid, the floor.
-    /*0xCB4*/ u16 field_CB4[20];
-    /*0xCDC*/ u32 field_CDC;
+    /*0xCA8*/ u8 challengeStatus;
+    /*0xCA9*/ u8 lvlMode:2;
+    /*0xCA9*/ u8 challengePaused:1;
+    /*0xCA9*/ u8 disableRecordBattle:1;
+    /*0xCAA*/ u16 selectedPartyMons[MAX_FRONTIER_PARTY_SIZE];
+    /*0xCB2*/ u16 curChallengeBattleNum; // Battle number / room number (Pike) / floor number (Pyramid)
+    /*0xCB4*/ u16 trainerIds[20];
+    /*0xCDC*/ u32 winStreakActiveFlags;
     /*0xCE0*/ u16 towerWinStreaks[4][2];
     /*0xCF0*/ u16 towerRecordWinStreaks[4][2];
-    /*0xD00*/ u16 field_D00;
-    /*0xD02*/ u16 field_D02;
-    /*0xD04*/ u16 field_D04;
-    /*0xD06*/ u8 field_D06;
-    /*0xD07*/ u8 field_D07;
-    /*0xD08*/ u8 field_D08_0:1;
-    /*0xD08*/ u8 field_D08_1:1;
-    /*0xD08*/ u8 field_D08_2:1;
-    /*0xD08*/ u8 field_D08_3:1;
-    /*0xD08*/ u8 field_D08_4:1;
-    /*0xD08*/ u8 field_D08_5:1;
-    /*0xD08*/ u8 field_D08_6:1;
-    /*0xD08*/ u8 field_D08_7:1;
-    /*0xD09*/ u8 filler_D09;
-    /*0xD0A*/ u8 field_D0A;
-    /*0xD0B*/ u8 field_D0B;
+    /*0xD00*/ u16 battledBrainFlags;
+    /*0xD02*/ u16 towerSinglesStreak; // Never read
+    /*0xD04*/ u16 towerNumWins; // Increments to MAX_STREAK but never read otherwise
+    /*0xD06*/ u8 towerBattleOutcome;
+    /*0xD07*/ u8 towerLvlMode;
+    /*0xD08*/ u8 domeAttemptedSingles50:1;
+    /*0xD08*/ u8 domeAttemptedSinglesOpen:1;
+    /*0xD08*/ u8 domeHasWonSingles50:1;
+    /*0xD08*/ u8 domeHasWonSinglesOpen:1;
+    /*0xD08*/ u8 domeAttemptedDoubles50:1;
+    /*0xD08*/ u8 domeAttemptedDoublesOpen:1;
+    /*0xD08*/ u8 domeHasWonDoubles50:1;
+    /*0xD08*/ u8 domeHasWonDoublesOpen:1;
+    /*0xD09*/ u8 domeUnused;
+    /*0xD0A*/ u8 domeLvlMode;
+    /*0xD0B*/ u8 domeBattleMode;
     /*0xD0C*/ u16 domeWinStreaks[2][2];
     /*0xD14*/ u16 domeRecordWinStreaks[2][2];
     /*0xD1C*/ u16 domeTotalChampionships[2][2];
     /*0xD24*/ struct BattleDomeTrainer domeTrainers[DOME_TOURNAMENT_TRAINERS_COUNT];
-    /*0xD64*/ u16 domeMonIds[DOME_TOURNAMENT_TRAINERS_COUNT][3];
-    /*0xDC4*/ u16 field_DC4;
-    /*0xDC6*/ u16 field_DC6;
+    /*0xD64*/ u16 domeMonIds[DOME_TOURNAMENT_TRAINERS_COUNT][FRONTIER_PARTY_SIZE];
+    /*0xDC4*/ u16 unused_DC4;
+    /*0xDC6*/ u16 palacePrize;
     /*0xDC8*/ u16 palaceWinStreaks[2][2];
     /*0xDD0*/ u16 palaceRecordWinStreaks[2][2];
-    /*0xDD8*/ u16 field_DD8;
+    /*0xDD8*/ u16 arenaPrize;
     /*0xDDA*/ u16 arenaWinStreaks[2];
     /*0xDDE*/ u16 arenaRecordStreaks[2];
     /*0xDE2*/ u16 factoryWinStreaks[2][2];
     /*0xDEA*/ u16 factoryRecordWinStreaks[2][2];
     /*0xDF6*/ u16 factoryRentsCount[2][2];
     /*0xDFA*/ u16 factoryRecordRentsCount[2][2];
-    /*0xE02*/ u16 field_E02;
+    /*0xE02*/ u16 pikePrize;
     /*0xE04*/ u16 pikeWinStreaks[2];
     /*0xE08*/ u16 pikeRecordStreaks[2];
     /*0xE0C*/ u16 pikeTotalStreaks[2];
-    /*0xE10*/ u8 field_E10_1:3;
-    /*0xE10*/ u8 field_E10_2:4;
-    /*0xE10*/ u8 field_E10_3:1;
-    /*0xE12*/ u16 field_E12[3];
-    /*0xE18*/ u16 field_E18;
+    /*0xE10*/ u8 pikeHintedRoomIndex:3;
+    /*0xE10*/ u8 pikeHintedRoomType:4;
+    /*0xE10*/ u8 pikeHealingRoomsDisabled:1;
+    /*0xE12*/ u16 pikeHeldItemsBackup[FRONTIER_PARTY_SIZE];
+    /*0xE18*/ u16 pyramidPrize;
     /*0xE1A*/ u16 pyramidWinStreaks[2];
     /*0xE1E*/ u16 pyramidRecordStreaks[2];
-    /*0xE22*/ u16 field_E22[4];
-    /*0xE2A*/ u8 field_E2A;
+    /*0xE22*/ u16 pyramidRandoms[4];
+    /*0xE2A*/ u8 pyramidTrainerFlags;
     /*0xE2C*/ struct PyramidBag pyramidBag;
-    /*0xE68*/ u8 field_E68;
-    /*0xE6A*/ u16 field_E6A;
-    /*0xE6C*/ u16 field_E6C;
-    /*0xE6E*/ u16 field_E6E;
-    /*0xE70*/ struct Struct_field_E70 field_E70[6];
+    /*0xE68*/ u8 pyramidLightRadius;
+    /*0xE6A*/ u16 verdanturfTentPrize;
+    /*0xE6C*/ u16 fallarborTentPrize;
+    /*0xE6E*/ u16 slateportTentPrize;
+    /*0xE70*/ struct RentalMon rentalMons[FRONTIER_PARTY_SIZE * 2];
     /*0xEB8*/ u16 battlePoints;
-    /*0xEBA*/ u16 field_EBA;
+    /*0xEBA*/ u16 cardBattlePoints;
     /*0xEBC*/ u32 battlesCount;
-    /*0xEC0*/ u16 field_EC0[16];
-    /*0xEE0*/ u8 field_EE0;
-    /*0xEE1*/ u8 field_EE1[2][PLAYER_NAME_LENGTH + 1];
-    /*0xEF1*/ u8 field_EF1[2][4];
-    /*0xEF9*/ u8 field_EF9;
-    /*0xEFA*/ u8 field_EFA;
-    /*0xEFB*/ u8 field_EFB;
-    /*0xEFC*/ struct FrontierMonData field_EFC[3];
+    /*0xEC0*/ u16 domeWinningMoves[DOME_TOURNAMENT_TRAINERS_COUNT];
+    /*0xEE0*/ u8 trainerFlags;
+    /*0xEE1*/ u8 opponentNames[2][PLAYER_NAME_LENGTH + 1];
+    /*0xEF1*/ u8 opponentTrainerIds[2][TRAINER_ID_LENGTH];
+    /*0xEF9*/ u8 unk_EF9:7; // Never read
+    /*0xEF9*/ u8 savedGame:1;
+    /*0xEFA*/ u8 unused_EFA;
+    /*0xEFB*/ u8 unused_EFB;
+    /*0xEFC*/ struct DomeMonData domePlayerPartyData[FRONTIER_PARTY_SIZE];
 };
 
-struct Sav2_B8
+struct ApprenticeQuestion
 {
-    u8 unk0_0:2;
-    u8 unk0_1:2;
-    u8 unk0_2:2;
-    u8 unk0_3:2;
-    u16 unk2;
+    u8 questionId:2;
+    u8 monId:2;
+    u8 moveSlot:2;
+    u8 suggestedChange:2; // TRUE if told to use held item or second move, FALSE if told to use no item or first move
+    u16 data; // used both as an itemId and a moveId
 };
 
 struct PlayersApprentice
 {
     /*0xB0*/ u8 id;
-    /*0xB1*/ u8 activeLvlMode:2; // +1, 0 means not active
-    /*0xB1*/ u8 field_B1_1:4;
-    /*0xB1*/ u8 field_B1_2:2;
-    /*0xB2*/ u8 field_B2_0:3;
-    /*0xB2*/ u8 field_B2_1:2;
-    /*0xB3*/ u8 field_B3;
-    /*0xB4*/ u8 monIds[3];
-    /*0xB8*/ struct Sav2_B8 field_B8[9];
+    /*0xB1*/ u8 lvlMode:2;  //0: Unassigned, 1: Lv 50, 2: Open Lv
+    /*0xB1*/ u8 questionsAnswered:4;
+    /*0xB1*/ u8 leadMonId:2;
+    /*0xB2*/ u8 party:3;
+    /*0xB2*/ u8 saveId:2; 
+    /*0xB3*/ u8 unused;
+    /*0xB4*/ u8 speciesIds[MULTI_PARTY_SIZE];
+    /*0xB8*/ struct ApprenticeQuestion questions[APPRENTICE_MAX_QUESTIONS];
 };
 
 struct RankingHall1P
 {
-    u8 id[4];
+    u8 id[TRAINER_ID_LENGTH];
     u16 winStreak;
     u8 name[PLAYER_NAME_LENGTH + 1];
     u8 language;
@@ -503,8 +443,8 @@ struct RankingHall1P
 
 struct RankingHall2P
 {
-    u8 id1[4];
-    u8 id2[4];
+    u8 id1[TRAINER_ID_LENGTH];
+    u8 id2[TRAINER_ID_LENGTH];
     u16 winStreak;
     u8 name1[PLAYER_NAME_LENGTH + 1];
     u8 name2[PLAYER_NAME_LENGTH + 1];
@@ -515,8 +455,8 @@ struct SaveBlock2
 {
     /*0x00*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
     /*0x08*/ u8 playerGender; // MALE, FEMALE
-    /*0x09*/ u8 specialSaveWarp;
-    /*0x0A*/ u8 playerTrainerId[4];
+    /*0x09*/ u8 specialSaveWarpFlags;
+    /*0x0A*/ u8 playerTrainerId[TRAINER_ID_LENGTH];
     /*0x0E*/ u16 playTimeHours;
     /*0x10*/ u8 playTimeMinutes;
     /*0x11*/ u8 playTimeSeconds;
@@ -532,16 +472,16 @@ struct SaveBlock2
     /*0x90*/ u8 filler_90[0x8];
     /*0x98*/ struct Time localTimeOffset;
     /*0xA0*/ struct Time lastBerryTreeUpdate;
-    /*0xA8*/ u32 field_A8;
+    /*0xA8*/ u32 gcnLinkFlags; // Read by Pokemon Colosseum/XD
     /*0xAC*/ u32 encryptionKey;
     /*0xB0*/ struct PlayersApprentice playerApprentice;
-    /*0xDC*/ struct Apprentice apprentices[4]; // From record mixing.
+    /*0xDC*/ struct Apprentice apprentices[APPRENTICE_COUNT];
     /*0x1EC*/ struct BerryCrush berryCrush;
     /*0x1FC*/ struct PokemonJumpResults pokeJump;
     /*0x20C*/ struct BerryPickingResults berryPick;
     /*0x21C*/ struct RankingHall1P hallRecords1P[HALL_FACILITIES_COUNT][2][3]; // From record mixing.
     /*0x57C*/ struct RankingHall2P hallRecords2P[2][3]; // From record mixing.
-    /*0x624*/ u16 contestLinkResults[5][4]; // 4 positions for 5 categories.
+    /*0x624*/ u16 contestLinkResults[CONTEST_CATEGORIES_COUNT][CONTESTANT_COUNT];
     /*0x64C*/ struct BattleFrontier frontier;
 }; // sizeof=0xF2C
 
@@ -550,28 +490,28 @@ extern struct SaveBlock2 *gSaveBlock2Ptr;
 struct SecretBaseParty
 {
     u32 personality[PARTY_SIZE];
-    u16 moves[PARTY_SIZE * 4];
+    u16 moves[PARTY_SIZE * MAX_MON_MOVES];
     u16 species[PARTY_SIZE];
     u16 heldItems[PARTY_SIZE];
     u8 levels[PARTY_SIZE];
     u8 EVs[PARTY_SIZE];
 };
 
-struct SecretBaseRecord
+struct SecretBase
 {
     /*0x1A9C*/ u8 secretBaseId;
     /*0x1A9D*/ u8 sbr_field_1_0:4;
     /*0x1A9D*/ u8 gender:1;
-    /*0x1A9D*/ u8 sbr_field_1_5:1;
-    /*0x1A9D*/ u8 sbr_field_1_6:2;
+    /*0x1A9D*/ u8 battledOwnerToday:1;
+    /*0x1A9D*/ u8 registryStatus:2;
     /*0x1A9E*/ u8 trainerName[PLAYER_NAME_LENGTH];
-    /*0x1AA5*/ u8 trainerId[4]; // byte 0 is used for determining trainer class
+    /*0x1AA5*/ u8 trainerId[TRAINER_ID_LENGTH]; // byte 0 is used for determining trainer class
     /*0x1AA9*/ u8 language;
-    /*0x1AAA*/ u16 sbr_field_e;
-    /*0x1AAC*/ u8 sbr_field_10;
+    /*0x1AAA*/ u16 numSecretBasesReceived;
+    /*0x1AAC*/ u8 numTimesEntered;
     /*0x1AAD*/ u8 sbr_field_11;
-    /*0x1AAE*/ u8 decorations[16];
-    /*0x1ABE*/ u8 decorationPos[16];
+    /*0x1AAE*/ u8 decorations[DECOR_MAX_SECRET_BASE];
+    /*0x1ABE*/ u8 decorationPositions[DECOR_MAX_SECRET_BASE];
     /*0x1AD0*/ struct SecretBaseParty party;
 };
 
@@ -651,7 +591,7 @@ struct MailStruct
 {
     /*0x00*/ u16 words[MAIL_WORDS_COUNT];
     /*0x12*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
-    /*0x1A*/ u8 trainerId[4];
+    /*0x1A*/ u8 trainerId[TRAINER_ID_LENGTH];
     /*0x1E*/ u16 species;
     /*0x20*/ u16 itemId;
 };
@@ -664,11 +604,11 @@ struct MauvilleManCommon
 struct MauvilleManBard
 {
     /*0x00*/ u8 id;
-    /*0x02*/ u16 songLyrics[6];
-    /*0x0E*/ u16 temporaryLyrics[6];
-    /*0x1A*/ u8 playerName[8];
+    /*0x02*/ u16 songLyrics[BARD_SONG_LENGTH];
+    /*0x0E*/ u16 temporaryLyrics[BARD_SONG_LENGTH];
+    /*0x1A*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
     /*0x22*/ u8 filler_2DB6[0x3];
-    /*0x25*/ u8 playerTrainerId[4];
+    /*0x25*/ u8 playerTrainerId[TRAINER_ID_LENGTH];
     /*0x29*/ bool8 hasChangedSong;
     /*0x2A*/ u8 language;
 }; /*size = 0x2C*/
@@ -678,10 +618,10 @@ struct MauvilleManStoryteller
     u8 id;
     bool8 alreadyRecorded;
     u8 filler2[2];
-    u8 gameStatIDs[4];
-    u8 trainerNames[4][7];
-    u8 statValues[4][4];
-    u8 language[4];
+    u8 gameStatIDs[NUM_STORYTELLER_TALES];
+    u8 trainerNames[NUM_STORYTELLER_TALES][PLAYER_NAME_LENGTH];
+    u8 statValues[NUM_STORYTELLER_TALES][4];
+    u8 language[NUM_STORYTELLER_TALES];
 };
 
 struct MauvilleManGiddy
@@ -704,10 +644,10 @@ struct MauvilleManHipster
 struct MauvilleOldManTrader
 {
     u8 id;
-    u8 decorIds[4];
-    u8 playerNames[4][11];
+    u8 decorations[NUM_TRADER_ITEMS];
+    u8 playerNames[NUM_TRADER_ITEMS][11];
     u8 alreadyTraded;
-    u8 language[4];
+    u8 language[NUM_TRADER_ITEMS];
 };
 
 typedef union OldMan
@@ -807,50 +747,43 @@ struct RecordMixingDayCareMail
     bool16 holdsItem[DAYCARE_MON_COUNT];
 };
 
-enum
-{
-    LILYCOVE_LADY_QUIZ,
-    LILYCOVE_LADY_FAVOUR,
-    LILYCOVE_LADY_CONTEST
-};
-
 struct LilycoveLadyQuiz
 {
     /*0x000*/ u8 id;
-    /*0x001*/ u8 phase;
-    /*0x002*/ u16 unk_002[9];
-    /*0x014*/ u16 unk_014;
-    /*0x016*/ u16 unk_016;
+    /*0x001*/ u8 state;
+    /*0x002*/ u16 question[9];
+    /*0x014*/ u16 correctAnswer;
+    /*0x016*/ u16 playerAnswer;
     /*0x018*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
-    /*0x020*/ u16 playerTrainerId[4];
-    /*0x028*/ u16 itemId;
-    /*0x02a*/ u8 unk_02a;
-    /*0x02b*/ u8 unk_02b;
-    /*0x02c*/ u8 unk_02c;
+    /*0x020*/ u16 playerTrainerId[TRAINER_ID_LENGTH];
+    /*0x028*/ u16 prize;
+    /*0x02a*/ bool8 waitingForChallenger;
+    /*0x02b*/ u8 questionId;
+    /*0x02c*/ u8 prevQuestionId;
     /*0x02d*/ u8 language;
 };
 
-struct LilycoveLadyFavour
+struct LilycoveLadyFavor
 {
     /*0x000*/ u8 id;
-    /*0x001*/ u8 phase;
-    /*0x002*/ u8 unk_002;
-    /*0x003*/ u8 unk_003;
+    /*0x001*/ u8 state;
+    /*0x002*/ bool8 likedItem;
+    /*0x003*/ u8 numItemsGiven;
     /*0x004*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
-    /*0x00c*/ u8 unk_00c;
+    /*0x00c*/ u8 favorId;
     /*0x00e*/ u16 itemId;
-    /*0x010*/ u16 unk_010;
+    /*0x010*/ u16 bestItem;
     /*0x012*/ u8 language;
 };
 
 struct LilycoveLadyContest
 {
     /*0x000*/ u8 id;
-    /*0x001*/ u8 phase;
-    /*0x002*/ u8 fave_pkblk;
-    /*0x003*/ u8 other_pkblk;
+    /*0x001*/ bool8 givenPokeblock;
+    /*0x002*/ u8 numGoodPokeblocksGiven;
+    /*0x003*/ u8 numOtherPokeblocksGiven;
     /*0x004*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
-    /*0x00c*/ u8 max_sheen;
+    /*0x00c*/ u8 maxSheen;
     /*0x00d*/ u8 category;
     /*0x00e*/ u8 language;
 };
@@ -858,7 +791,7 @@ struct LilycoveLadyContest
 typedef union // 3b58
 {
     struct LilycoveLadyQuiz quiz;
-    struct LilycoveLadyFavour favour;
+    struct LilycoveLadyFavor favor;
     struct LilycoveLadyContest contest;
     u8 id;
     u8 pad[0x40];
@@ -866,27 +799,112 @@ typedef union // 3b58
 
 struct WaldaPhrase
 {
-    u16 field_0;
-    u16 field_2;
+    u16 colors[2]; // Background, foreground.
     u8 text[16];
     u8 iconId;
     u8 patternId;
     bool8 patternUnlocked;
 };
 
-struct UnkSaveSubstruct_3b98 {
+struct TrainerNameRecord
+{
     u32 trainerId;
     u8 trainerName[PLAYER_NAME_LENGTH + 1];
 };
+
+struct SaveTrainerHill
+{
+    /*0x3D64*/ u32 timer;
+    /*0x3D68*/ u32 bestTime;
+    /*0x3D6C*/ u8 unk_3D6C;
+    /*0x3D6D*/ u8 unused;
+    /*0x3D6E*/ u16 receivedPrize:1;
+    /*0x3D6E*/ u16 checkedFinalTime:1;
+    /*0x3D6E*/ u16 spokeToOwner:1;
+    /*0x3D6E*/ u16 hasLost:1;
+    /*0x3D6E*/ u16 maybeECardScanDuringChallenge:1;
+    /*0x3D6E*/ u16 field_3D6E_0f:1;
+    /*0x3D6E*/ u16 tag:2;
+};
+
+struct MysteryEventStruct
+{
+    u8 unk_0_0:2;
+    u8 unk_0_2:3;
+    u8 unk_0_5:3;
+    u8 unk_1;
+};
+
+ struct WonderNews
+{
+    u16 unk_00;
+    u8 unk_02;
+    u8 unk_03;
+    u8 unk_04[40];
+    u8 unk_2C[10][40];
+};
+
+ struct WonderNewsSaveStruct
+{
+    u32 crc;
+    struct WonderNews data;
+};
+
+ struct WonderCard
+{
+    u16 unk_00;
+    u16 unk_02;
+    u32 unk_04;
+    u8 unk_08_0:2;
+    u8 unk_08_2:4;
+    u8 unk_08_6:2;
+    u8 unk_09;
+    u8 unk_0A[40];
+    u8 unk_32[40];
+    u8 unk_5A[4][40];
+    u8 unk_FA[40];
+    u8 unk_122[40];
+};
+
+ struct WonderCardSaveStruct
+{
+    u32 crc;
+    struct WonderCard data;
+};
+
+ struct MEventBuffer_3430_Sub
+{
+    u16 unk_00;
+    u16 unk_02;
+    u16 unk_04;
+    u16 unk_06;
+    u16 unk_08[2][7];
+};
+
+ struct MEventBuffer_3430
+{
+    u32 crc;
+    struct MEventBuffer_3430_Sub data;
+};
+
+ struct MEventBuffers
+{
+    /*0x000 0x322C*/ struct WonderNewsSaveStruct wonderNews;
+    /*0x1c0 0x33EC*/ struct WonderCardSaveStruct wonderCard;
+    /*0x310 0x353C*/ struct MEventBuffer_3430 buffer_310;
+    /*0x338 0x3564*/ u16 unk_338[4];
+    /*0x340 0x356C*/ struct MysteryEventStruct unk_340;
+    /*0x344 0x3570*/ u32 unk_344[2][5];
+}; // 0x36C 0x3598
 
 struct SaveBlock1
 {
     /*0x00*/ struct Coords16 pos;
     /*0x04*/ struct WarpData location;
-    /*0x0C*/ struct WarpData warp1;
-    /*0x14*/ struct WarpData warp2;
-    /*0x1C*/ struct WarpData lastHealLocation;
-    /*0x24*/ struct WarpData warp4;
+    /*0x0C*/ struct WarpData continueGameWarp;
+    /*0x14*/ struct WarpData dynamicWarp;
+    /*0x1C*/ struct WarpData lastHealLocation; // used by white-out and teleport
+    /*0x24*/ struct WarpData escapeWarp; // used by Dig and Escape Rope
     /*0x2C*/ u16 savedMusic;
     /*0x2E*/ u8 weather;
     /*0x2F*/ u8 weatherCycleStage;
@@ -909,24 +927,24 @@ struct SaveBlock1
     /*0x9BC*/ u16 berryBlenderRecords[3];
     /*0x9C2*/ u8 field_9C2[6];
     /*0x9C8*/ u16 trainerRematchStepCounter;
-    /*0x9CA*/ u8 trainerRematches[100];
-    /*0xA30*/ struct EventObject eventObjects[EVENT_OBJECTS_COUNT];
-    /*0xC70*/ struct EventObjectTemplate eventObjectTemplates[EVENT_OBJECT_TEMPLATES_COUNT];
-    /*0x1270*/ u8 flags[FLAGS_COUNT];
+    /*0x9CA*/ u8 trainerRematches[MAX_REMATCH_ENTRIES];
+    /*0xA30*/ struct ObjectEvent objectEvents[OBJECT_EVENTS_COUNT];
+    /*0xC70*/ struct ObjectEventTemplate objectEventTemplates[OBJECT_EVENT_TEMPLATES_COUNT];
+    /*0x1270*/ u8 flags[NUM_FLAG_BYTES];
     /*0x139C*/ u16 vars[VARS_COUNT];
     /*0x159C*/ u32 gameStats[NUM_GAME_STATS];
     /*0x169C*/ struct BerryTree berryTrees[BERRY_TREES_COUNT];
-    /*0x1A9C*/ struct SecretBaseRecord secretBases[SECRET_BASES_COUNT];
-    /*0x271C*/ u8 playerRoomDecor[12];
-    /*0x2728*/ u8 playerRoomDecorPos[12];
-    /*0x2734*/ u8 decorDesk[10];
-    /*0x????*/ u8 decorChair[10];
-    /*0x????*/ u8 decorPlant[10];
-    /*0x????*/ u8 decorOrnament[30];
-    /*0x????*/ u8 decorMat[30];
-    /*0x????*/ u8 decorPoster[10];
-    /*0x????*/ u8 decorDoll[40];
-    /*0x????*/ u8 decorCushion[10];
+    /*0x1A9C*/ struct SecretBase secretBases[SECRET_BASES_COUNT];
+    /*0x271C*/ u8 playerRoomDecorations[DECOR_MAX_PLAYERS_HOUSE];
+    /*0x2728*/ u8 playerRoomDecorationPositions[DECOR_MAX_PLAYERS_HOUSE];
+    /*0x2734*/ u8 decorationDesks[10];
+    /*0x273E*/ u8 decorationChairs[10];
+    /*0x2748*/ u8 decorationPlants[10];
+    /*0x2752*/ u8 decorationOrnaments[30];
+    /*0x2770*/ u8 decorationMats[30];
+    /*0x278E*/ u8 decorationPosters[10];
+    /*0x2798*/ u8 decorationDolls[40];
+    /*0x27C0*/ u8 decorationCushions[10];
     /*0x27CA*/ u8 padding_27CA[2];
     /*0x27CC*/ TVShow tvShows[TV_SHOWS_COUNT];
     /*0x2B50*/ PokeNews pokeNews[POKE_NEWS_COUNT];
@@ -936,33 +954,36 @@ struct SaveBlock1
     /*0x2B94*/ u8 outbreakPokemonLevel;
     /*0x2B95*/ u8 outbreakUnk1;
     /*0x2B96*/ u16 outbreakUnk2;
-    /*0x2B98*/ u16 outbreakPokemonMoves[4];
+    /*0x2B98*/ u16 outbreakPokemonMoves[MAX_MON_MOVES];
     /*0x2BA0*/ u8 outbreakUnk4;
     /*0x2BA1*/ u8 outbreakPokemonProbability;
     /*0x2BA2*/ u16 outbreakDaysLeft;
     /*0x2BA4*/ struct GabbyAndTyData gabbyAndTyData;
-    /*0x2BB0*/ u16 unk2BB0[6];
-    /*0x2BBC*/ u16 unk2BBC[6];
-    /*0x2BC8*/ u16 unk2BC8[6];
-    /*0x2BD4*/ u16 unk2BD4[6];
+    /*0x2BB0*/ u16 easyChatProfile[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x2BBC*/ u16 easyChatBattleStart[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x2BC8*/ u16 easyChatBattleWon[EASY_CHAT_BATTLE_WORDS_COUNT];
+    /*0x2BD4*/ u16 easyChatBattleLost[EASY_CHAT_BATTLE_WORDS_COUNT];
     /*0x2BE0*/ struct MailStruct mail[MAIL_COUNT];
-    /*0x2E20*/ u8 additionalPhrases[5]; // bitfield for 33 additional phrases in easy chat system
-    /*0x2E25*/ u8 unk2E25[3]; // possibly padding?
+    /*0x2E20*/ u8 additionalPhrases[8]; // bitfield for 33 additional phrases in easy chat system
     /*0x2E28*/ OldMan oldMan;
     /*0x2e64*/ struct EasyChatPair easyChatPairs[5]; //Dewford trend [0] and some other stuff
-    /*0x2e90*/ struct ContestWinner contestWinners[13]; // 0 - 5 used in contest hall, 6 - 7 unused?, 8 - 12 museum
+    /*0x2e90*/ struct ContestWinner contestWinners[NUM_CONTEST_WINNERS]; // see CONTEST_WINNER_*
     /*0x3030*/ struct DayCare daycare;
     /*0x3150*/ struct LinkBattleRecords linkBattleRecords;
     /*0x31A8*/ u8 giftRibbons[52];
     /*0x31DC*/ struct Roamer roamer;
     /*0x31F8*/ struct EnigmaBerry enigmaBerry;
-    /*0x322C*/ u8 field_322C[1276];
+    /*0x322C*/ struct MEventBuffers unk_322C;
+    /*0x3598*/ u8 field_3598[0x180];
+    /*0x3718*/ u32 trainerHillTimes[4];
     /*0x3728*/ struct RamScript ramScript;
     /*0x3B14*/ struct RecordMixingGift recordMixingGift;
     /*0x3B24*/ u8 seen2[DEX_FLAGS_NO];
     /*0x3B58*/ LilycoveLady lilycoveLady;
-    /*0x3B98*/ struct UnkSaveSubstruct_3b98 unk_3B98[20];
-    /*0x3C88*/ u8 filler_3C88[0xE8];
+    /*0x3B98*/ struct TrainerNameRecord trainerNameRecords[20];
+    /*0x3C88*/ u8 registeredTexts[UNION_ROOM_KB_ROW_COUNT][21];
+    /*0x3D5A*/ u8 filler3D5A[0xA];
+    /*0x3D64*/ struct SaveTrainerHill trainerHill;
     /*0x3D70*/ struct WaldaPhrase waldaPhrase;
     // sizeof: 0x3D88
 };
@@ -976,13 +997,13 @@ struct MapPosition
     s8 height;
 };
 
-struct UnkStruct_8054FF8
+struct TradeRoomPlayer
 {
-    u8 a;
-    u8 b;
+    u8 playerId;
+    u8 isLocalPlayer;
     u8 c;
-    u8 d;
-    struct MapPosition sub;
+    u8 facing;
+    struct MapPosition pos;
     u16 field_C;
 };
 

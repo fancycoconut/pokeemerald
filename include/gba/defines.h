@@ -6,8 +6,16 @@
 #define TRUE  1
 #define FALSE 0
 
+#define BSS_DATA   __attribute__((section(".bss")))
 #define IWRAM_DATA __attribute__((section("iwram_data")))
 #define EWRAM_DATA __attribute__((section("ewram_data")))
+#define UNUSED __attribute__((unused))
+
+#if MODERN
+#define NOINLINE __attribute__((noinline))
+#else
+#define NOINLINE
+#endif
 
 #define ALIGNED(n) __attribute__((aligned(n)))
 
@@ -65,7 +73,5 @@
 #define TILE_OFFSET_8BPP(n) ((n) * TILE_SIZE_8BPP)
 
 #define TOTAL_OBJ_TILE_COUNT 1024
-
-#define WIN_RANGE(a, b) (((a) << 8) | (b))
 
 #endif // GUARD_GBA_DEFINES

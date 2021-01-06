@@ -18,11 +18,11 @@
 #include "international_string_util.h"
 #include "sound.h"
 #include "constants/songs.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "gpu_regs.h"
 #include "constants/game_stat.h"
-
-extern void PrintOnTrainerHillRecordsWindow(void); // pokenav.s
+#include "trainer_hill.h"
+#include "constants/rgb.h"
 
 // this file's functions
 static void Task_CloseTrainerHillRecordsOnButton(u8 taskId);
@@ -320,8 +320,8 @@ void ShowLinkBattleRecords(void)
     s32 i, x;
 
     gRecordsWindowId = AddWindow(&sLinkBattleRecordsWindow);
-    NewMenuHelpers_DrawStdWindowFrame(gRecordsWindowId, FALSE);
-    FillWindowPixelBuffer(gRecordsWindowId, 0x11);
+    DrawStdWindowFrame(gRecordsWindowId, FALSE);
+    FillWindowPixelBuffer(gRecordsWindowId, PIXEL_FILL(1));
     StringExpandPlaceholders(gStringVar4, gText_PlayersBattleResults);
 
     x = GetStringCenterAlignXOffset(1, gStringVar4, 208);
@@ -342,7 +342,7 @@ void ShowLinkBattleRecords(void)
 
 void RemoveRecordsWindow(void)
 {
-    sub_819746C(gRecordsWindowId, FALSE);
+    ClearStdWindowAndFrame(gRecordsWindowId, FALSE);
     RemoveWindow(gRecordsWindowId);
 }
 
@@ -356,7 +356,7 @@ static void Task_CloseTrainerHillRecordsOnButton(u8 taskId)
 {
     struct Task *task = &gTasks[taskId];
 
-    if (gMain.newKeys & A_BUTTON || gMain.newKeys & B_BUTTON)
+    if (JOY_NEW(A_BUTTON) || JOY_NEW(B_BUTTON))
     {
         PlaySE(SE_SELECT);
         task->func = Task_BeginPaletteFade;
@@ -365,7 +365,7 @@ static void Task_CloseTrainerHillRecordsOnButton(u8 taskId)
 
 static void Task_BeginPaletteFade(u8 taskId)
 {
-    BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, 0);
+    BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, RGB_BLACK);
     gTasks[taskId].func = Task_ExitTrainerHillRecords;
 }
 
@@ -383,7 +383,7 @@ static void Task_ExitTrainerHillRecords(u8 taskId)
 
 static void RemoveTrainerHillRecordsWindow(u8 windowId)
 {
-    FillWindowPixelBuffer(windowId, 0);
+    FillWindowPixelBuffer(windowId, PIXEL_FILL(0));
     ClearWindowTilemap(windowId);
     CopyWindowToVram(windowId, 2);
     RemoveWindow(windowId);
@@ -485,7 +485,7 @@ static void CB2_ShowTrainerHillRecords(void)
         gMain.state++;
         break;
     case 2:
-        sTilemapBuffer = AllocZeroed(0x800);
+        sTilemapBuffer = AllocZeroed(BG_SCREEN_SIZE);
         ResetBgsAndClearDma3BusyFlags(0);
         InitBgsFromTemplates(0, sTrainerHillRecordsBgTemplates, ARRAY_COUNT(sTrainerHillRecordsBgTemplates));
         SetBgTilemapBuffer(3, sTilemapBuffer);
@@ -494,7 +494,7 @@ static void CB2_ShowTrainerHillRecords(void)
         break;
     case 3:
         LoadTrainerHillRecordsWindowGfx(3);
-        LoadPalette(stdpal_get(0), 0xF0, 0x20);
+        LoadPalette(GetTextWindowPalette(0), 0xF0, 0x20);
         gMain.state++;
         break;
     case 4:
@@ -512,7 +512,7 @@ static void CB2_ShowTrainerHillRecords(void)
         gMain.state++;
         break;
     case 6:
-        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0x10, 0, 0);
+        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0x10, 0, RGB_BLACK);
         gMain.state++;
         break;
     case 7:

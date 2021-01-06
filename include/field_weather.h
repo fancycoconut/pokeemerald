@@ -2,24 +2,7 @@
 #define GUARD_WEATHER_H
 
 #include "sprite.h"
-
-// Controls how the weather should be changing the screen palettes.
-enum
-{
-    WEATHER_PAL_STATE_CHANGING_WEATHER,
-    WEATHER_PAL_STATE_SCREEN_FADING_IN,
-    WEATHER_PAL_STATE_SCREEN_FADING_OUT,
-    WEATHER_PAL_STATE_IDLE,
-};
-
-// For the FadeScreen function.
-enum
-{
-    FADE_FROM_BLACK,
-    FADE_TO_BLACK,
-    FADE_FROM_WHITE,
-    FADE_TO_WHITE,
-};
+#include "constants/field_weather.h"
 
 struct Weather
 {
@@ -27,18 +10,18 @@ struct Weather
     {
         struct
         {
-            struct Sprite *rainSprites[24];
+            struct Sprite *rainSprites[MAX_RAIN_SPRITES];
             struct Sprite *snowflakeSprites[101];
-            struct Sprite *cloudSprites[3];
+            struct Sprite *cloudSprites[NUM_CLOUD_SPRITES];
         } s1;
         struct
         {
             u8 filler0[0xA0];
-            struct Sprite *fog1Sprites[20];
-            struct Sprite *ashSprites[20];
-            struct Sprite *fog2Sprites[20];
-            struct Sprite *sandstormSprites1[20];
-            struct Sprite *sandstormSprites2[5];
+            struct Sprite *fogHSprites[NUM_FOG_HORIZONTAL_SPRITES];
+            struct Sprite *ashSprites[NUM_ASH_SPRITES];
+            struct Sprite *fogDSprites[NUM_FOG_DIAGONAL_SPRITES];
+            struct Sprite *sandstormSprites1[NUM_SANDSTORM_SPRITES];
+            struct Sprite *sandstormSprites2[NUM_SWIRL_SANDSTORM_SPRITES];
         } s2;
     } sprites;
     u8 gammaShifts[19][32];
@@ -62,57 +45,57 @@ struct Weather
     bool8 weatherChangeComplete;
     u8 weatherPicSpritePalIndex;
     u8 altGammaSpritePalIndex;
-    u16 unknown_6D6;
-    u8 unknown_6D8;
-    u8 unknown_6D9;
+    u16 rainSpriteVisibleCounter;
+    u8 curRainSpriteIndex;
+    u8 targetRainSpriteCount;
     u8 rainSpriteCount;
-    u8 unknown_6DB;
-    u8 unknown_6DC;
+    u8 rainSpriteVisibleDelay;
+    u8 isDownpour;
     u8 rainStrength;
     /*0x6DE*/ u8 cloudSpritesCreated;
     u8 filler_6DF[1];
-    u16 unknown_6E0;
+    u16 snowflakeVisibleCounter;
     u16 unknown_6E2;
     u8 snowflakeSpriteCount;
-    u8 unknown_6E5;
+    u8 targetSnowflakeSpriteCount;
     u16 unknown_6E6;
     u16 thunderCounter;
     u8 unknown_6EA;
     u8 unknown_6EB;
     u8 unknown_6EC;
-    u8 unknown_6ED;
-    u16 fog1ScrollPosX;
-    u16 unknown_6F0;
-    u16 unknown_6F2;
+    u8 thunderTriggered;
+    u16 fogHScrollPosX;
+    u16 fogHScrollCounter;
+    u16 fogHScrollOffset;
     u8 lightenedFogSpritePals[6];
     u8 lightenedFogSpritePalsCount;
-    u8 fog1SpritesCreated;
-    u16 unknown_6FC;
+    u8 fogHSpritesCreated;
+    u16 ashBaseSpritesX;
     u16 unknown_6FE;
     u8 ashSpritesCreated;
     u8 filler_701[3];
-    u32 unknown_704;
-    u32 unknown_708;
+    u32 sandstormXOffset;
+    u32 sandstormYOffset;
     u8 filler_70C[2];
-    u16 unknown_70E;
-    u16 unknown_710;
-    u16 unknown_712;
-    u16 unknown_714;
-    u8 sandstormSprites1Created;
-    u8 sandstormSprites2Created;
-    u16 unknown_718;
-    u16 unknown_71A;
-    u16 unknown_71C;
-    u16 unknown_71E;
-    u16 unknown_720;
-    u16 unknown_722;
-    u8 fog2SpritesCreated;
+    u16 sandstormBaseSpritesX;
+    u16 sandstormPosY;
+    u16 sandstormWaveIndex;
+    u16 sandstormWaveCounter;
+    u8 sandstormSpritesCreated;
+    u8 sandstormSwirlSpritesCreated;
+    u16 fogDBaseSpritesX;
+    u16 fogDPosY;
+    u16 fogDScrollXCounter;
+    u16 fogDScrollYCounter;
+    u16 fogDXOffset;
+    u16 fogDYOffset;
+    u8 fogDSpritesCreated;
     u8 filler_725[1];
-    u16 unknown_726;
-    u16 unknown_728;
-    u16 unknown_72A;
-    u16 unknown_72C;
-    u8 unknown_72E;
+    u16 bubblesDelayCounter;
+    u16 bubblesDelayIndex;
+    u16 bubblesCoordsIndex;
+    u16 bubblesSpriteCount;
+    u8 bubblesSpritesCreated;
     u8 filler_72F;
     u16 currBlendEVA;
     u16 currBlendEVB;
@@ -134,11 +117,15 @@ struct Weather
 // field_weather.c
 extern struct Weather gWeather;
 extern struct Weather *const gWeatherPtr;
+extern const u16 gUnknown_083970E8[];
+
+// field_weather_effect.c
+extern const u8 gWeatherFogHorizontalTiles[];
 
 void StartWeather(void);
-void ChangeWeather(u8 weather);
-void sub_80AB104(u8 weather);
-void sub_80AB130(u8 weather);
+void SetNextWeather(u8 weather);
+void SetCurrentAndNextWeather(u8 weather);
+void SetCurrentAndNextWeatherNoDelay(u8 weather);
 void sub_80ABC48(s8 gammaIndex);
 void sub_80ABC7C(u8 gammaIndex, u8 gammaTargetIndex, u8 gammaStepDelay);
 void FadeScreen(u8 mode, s8 delay);
@@ -158,7 +145,7 @@ bool8 Weather_UpdateBlend(void);
 void sub_80AC274(u8 a);
 u8 GetCurrentWeather(void);
 void SetRainStrengthFromSoundEffect(u16 soundEffect);
-void PlayRainSoundEffect(void);
+void PlayRainStoppingSoundEffect(void);
 u8 IsWeatherChangeComplete(void);
 void SetWeatherScreenFadeOut(void);
 void sub_80AC3E4(void);
@@ -170,26 +157,26 @@ void Clouds_InitVars(void);
 void Clouds_Main(void);
 void Clouds_InitAll(void);
 bool8 Clouds_Finish(void);
-void Weather2_InitVars(void);
-void Weather2_Main(void);
-void Weather2_InitAll(void);
-bool8 Weather2_Finish(void);
-void LightRain_InitVars(void);
-void LightRain_Main(void);
-void LightRain_InitAll(void);
-bool8 LightRain_Finish(void);
+void Sunny_InitVars(void);
+void Sunny_Main(void);
+void Sunny_InitAll(void);
+bool8 Sunny_Finish(void);
+void Rain_InitVars(void);
+void Rain_Main(void);
+void Rain_InitAll(void);
+bool8 Rain_Finish(void);
 void Snow_InitVars(void);
 void Snow_Main(void);
 void Snow_InitAll(void);
 bool8 Snow_Finish(void);
-void MedRain_InitVars(void);
-void Rain_Main(void);
-void MedRain_InitAll(void);
-bool8 Rain_Finish(void);
-void Fog1_InitVars(void);
-void Fog1_Main(void);
-void Fog1_InitAll(void);
-bool8 Fog1_Finish(void);
+void Thunderstorm_InitVars(void);
+void Thunderstorm_Main(void);
+void Thunderstorm_InitAll(void);
+bool8 Thunderstorm_Finish(void);
+void FogHorizontal_InitVars(void);
+void FogHorizontal_Main(void);
+void FogHorizontal_InitAll(void);
+bool8 FogHorizontal_Finish(void);
 void Ash_InitVars(void);
 void Ash_Main(void);
 void Ash_InitAll(void);
@@ -198,14 +185,10 @@ void Sandstorm_InitVars(void);
 void Sandstorm_Main(void);
 void Sandstorm_InitAll(void);
 bool8 Sandstorm_Finish(void);
-void Fog2_InitVars(void);
-void Fog2_Main(void);
-void Fog2_InitAll(void);
-bool8 Fog2_Finish(void);
-void Fog1_InitVars(void);
-void Fog1_Main(void);
-void Fog1_InitAll(void);
-bool8 Fog1_Finish(void);
+void FogDiagonal_InitVars(void);
+void FogDiagonal_Main(void);
+void FogDiagonal_InitAll(void);
+bool8 FogDiagonal_Finish(void);
 void Shade_InitVars(void);
 void Shade_Main(void);
 void Shade_InitAll(void);
@@ -214,10 +197,8 @@ void Drought_InitVars(void);
 void Drought_Main(void);
 void Drought_InitAll(void);
 bool8 Drought_Finish(void);
-void HeavyRain_InitVars(void);
-void Rain_Main(void);
-void HeavyRain_InitAll(void);
-bool8 Rain_Finish(void);
+void Downpour_InitVars(void);
+void Downpour_InitAll(void);
 void Bubbles_InitVars(void);
 void Bubbles_Main(void);
 void Bubbles_InitAll(void);
@@ -229,5 +210,6 @@ void SetSav1WeatherFromCurrMapHeader(void);
 void SetWeather(u32 weather);
 void DoCurrentWeather(void);
 void UpdateWeatherPerDay(u16 increment);
+void ResumePausedWeather(void);
 
 #endif // GUARD_WEATHER_H

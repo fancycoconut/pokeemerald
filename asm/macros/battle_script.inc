@@ -391,17 +391,49 @@
 	.byte 0x47
 	.endm
 
-	.macro playstatchangeanimation battler:req, param1:req, param2:req
+	.macro playstatchangeanimation battler:req, stats:req, statchange:req
 	.byte 0x48
 	.byte \battler
-	.byte \param1
-	.byte \param2
+	.byte \stats
+	.byte \statchange
 	.endm
 
 	.macro moveend param0:req, param1:req
 	.byte 0x49
 	.byte \param0
 	.byte \param1
+	.endm
+	
+	@ Help macros for 5 uses of moveend command
+	
+	@ All cases
+	.macro moveendall
+	setbyte sMOVEEND_STATE, 0
+	moveend 0, 0
+	.endm
+	
+	@ Chosen case
+	.macro moveendcase case:req
+	setbyte sMOVEEND_STATE, \case
+	moveend 1, 0
+	.endm
+	
+	@ All cases from (inclusive)
+	.macro moveendfrom from:req
+	setbyte sMOVEEND_STATE, \from
+	moveend 0, 0
+	.endm
+	
+	@ All cases from 0 to (not inclusive)
+	.macro moveendto to:req
+	setbyte sMOVEEND_STATE, 0
+	moveend 2, \to
+	.endm
+	
+	@ Cases from (inclusive) to (not inclusive)
+	.macro moveendfromto from:req, to:req
+	setbyte sMOVEEND_STATE, \from
+	moveend 2, \to
 	.endm
 
 	.macro typecalc2
@@ -706,10 +738,10 @@
 	.byte 0x88
 	.endm
 
-	.macro statbuffchange param0:req, param1:req
+	.macro statbuffchange flags:req, jumpptr:req
 	.byte 0x89
-	.byte \param0
-	.4byte \param1
+	.byte \flags
+	.4byte \jumpptr
 	.endm
 
 	.macro normalisebuffs
@@ -1078,7 +1110,7 @@
 	.4byte \param0
 	.endm
 
-	.macro tryimprision param0:req
+	.macro tryimprison param0:req
 	.byte 0xdb
 	.4byte \param0
 	.endm
@@ -1092,7 +1124,7 @@
 	.byte 0xdd
 	.endm
 
-	.macro asistattackselect param0:req
+	.macro assistattackselect param0:req
 	.byte 0xde
 	.4byte \param0
 	.endm
@@ -1231,11 +1263,11 @@
 	various \battler, VARIOUS_GET_MOVE_TARGET
 	.endm
 	
-	.macro various4 battler:req
-	various \battler, 4
+	.macro getbattlerfainted battler:req
+	various \battler, VARIOUS_GET_BATTLER_FAINTED
 	.endm
 	
-	.macro resetintrimidatetracebits battler:req
+	.macro resetintimidatetracebits battler:req
 	various \battler, VARIOUS_RESET_INTIMIDATE_TRACE_BITS
 	.endm
 	
@@ -1247,8 +1279,8 @@
 	various \battler, 7
 	.endm
 	
-	.macro various8 battler:req
-	various \battler, 8
+	.macro palaceflavortext battler:req
+	various \battler, VARIOUS_PALACE_FLAVOR_TEXT
 	.endm
 	
 	.macro arenajudgmentwindow
@@ -1333,23 +1365,23 @@
 	.endm
 	
 	.macro chosenstatus1animation battler:req, status:req
-	chosenstatusanimation \battler 0x0 \status
+	chosenstatusanimation \battler, 0x0, \status
 	.endm
 	
 	.macro chosenstatus2animation battler:req, status:req
-	chosenstatusanimation \battler 0x1 \status
+	chosenstatusanimation \battler, 0x1, \status
 	.endm
 	
 	.macro sethword dst:req, value:req
-	setbyte \dst, \value & 0xFF
-	setbyte \dst + 1, (\value >> 8) & 0xFF
+	setbyte \dst, (\value) & 0xFF
+	setbyte \dst + 1, ((\value) >> 8) & 0xFF
 	.endm
 	
 	.macro setword dst:req, value:req
-	setbyte \dst, \value & 0xFF
-	setbyte \dst + 1, (\value >> 8) & 0xFF
-	setbyte \dst + 2, (\value >> 16) & 0xFF
-	setbyte \dst + 3, (\value >> 24) & 0xFF
+	setbyte \dst, (\value) & 0xFF
+	setbyte \dst + 1, ((\value) >> 8) & 0xFF
+	setbyte \dst + 2, ((\value) >> 16) & 0xFF
+	setbyte \dst + 3, ((\value) >> 24) & 0xFF
 	.endm
 	
 	.macro copybyte dst:req, src:req

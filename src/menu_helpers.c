@@ -18,8 +18,6 @@
 #include "constants/items.h"
 #include "constants/maps.h"
 
-extern bool32 sub_800B504(void);
-
 // this file's functions
 static void Task_ContinueTaskAfterMessagePrints(u8 taskId);
 static void Task_CallYesOrNoCallback(u8 taskId);
@@ -29,20 +27,20 @@ EWRAM_DATA static struct YesNoFuncTable gUnknown_0203A138 = {0};
 EWRAM_DATA static u8 gUnknown_0203A140 = 0;
 
 // IWRAM bss vars
-IWRAM_DATA static TaskFunc gUnknown_0300117C;
+static TaskFunc gUnknown_0300117C;
 
 // const rom data
 static const struct OamData sOamData_859F4E8 =
 {
     .y = 0,
-    .affineMode = 0,
-    .objMode = 0,
+    .affineMode = ST_OAM_AFFINE_OFF,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
-    .bpp = 0,
-    .shape = 0,
+    .bpp = ST_OAM_4BPP,
+    .shape = SPRITE_SHAPE(16x16),
     .x = 0,
     .matrixNum = 0,
-    .size = 1,
+    .size = SPRITE_SIZE(16x16),
     .tileNum = 0,
     .priority = 0,
     .paletteNum = 0,
@@ -129,7 +127,7 @@ void SetVBlankHBlankCallbacksToNull(void)
 void DisplayMessageAndContinueTask(u8 taskId, u8 windowId, u16 arg2, u8 arg3, u8 fontId, u8 textSpeed, const u8 *string, void *taskFunc)
 {
     gUnknown_0203A140 = windowId;
-    sub_8197B1C(windowId, TRUE, arg2, arg3);
+    DrawDialogFrameWithCustomTileAndPalette(windowId, TRUE, arg2, arg3);
 
     if (string != gStringVar4)
         StringExpandPlaceholders(gStringVar4, string);
@@ -152,7 +150,7 @@ static void Task_ContinueTaskAfterMessagePrints(u8 taskId)
         gUnknown_0300117C(taskId);
 }
 
-void sub_8121F68(u8 taskId, const struct YesNoFuncTable *data)
+void DoYesNoFuncWithChoice(u8 taskId, const struct YesNoFuncTable *data)
 {
     gUnknown_0203A138 = *data;
     gTasks[taskId].func = Task_CallYesOrNoCallback;
@@ -185,7 +183,7 @@ bool8 AdjustQuantityAccordingToDPadInput(s16 *arg0, u16 arg1)
 {
     s16 valBefore = (*arg0);
 
-    if ((gMain.newAndRepeatedKeys & DPAD_ANY) == DPAD_UP)
+    if ((JOY_REPEAT(DPAD_ANY)) == DPAD_UP)
     {
         (*arg0)++;
         if ((*arg0) > arg1)
@@ -201,7 +199,7 @@ bool8 AdjustQuantityAccordingToDPadInput(s16 *arg0, u16 arg1)
             return TRUE;
         }
     }
-    else if ((gMain.newAndRepeatedKeys & DPAD_ANY) == DPAD_DOWN)
+    else if ((JOY_REPEAT(DPAD_ANY)) == DPAD_DOWN)
     {
         (*arg0)--;
         if ((*arg0) <= 0)
@@ -217,7 +215,7 @@ bool8 AdjustQuantityAccordingToDPadInput(s16 *arg0, u16 arg1)
             return TRUE;
         }
     }
-    else if ((gMain.newAndRepeatedKeys & DPAD_ANY) == DPAD_RIGHT)
+    else if ((JOY_REPEAT(DPAD_ANY)) == DPAD_RIGHT)
     {
         (*arg0) += 10;
         if ((*arg0) > arg1)
@@ -233,7 +231,7 @@ bool8 AdjustQuantityAccordingToDPadInput(s16 *arg0, u16 arg1)
             return TRUE;
         }
     }
-    else if ((gMain.newAndRepeatedKeys & DPAD_ANY) == DPAD_LEFT)
+    else if ((JOY_REPEAT(DPAD_ANY)) == DPAD_LEFT)
     {
         (*arg0) -= 10;
         if ((*arg0) <= 0)
@@ -253,27 +251,27 @@ bool8 AdjustQuantityAccordingToDPadInput(s16 *arg0, u16 arg1)
     return FALSE;
 }
 
-u8 GetLRKeysState(void)
+u8 GetLRKeysPressed(void)
 {
     if (gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR)
     {
-        if (gMain.newKeys & L_BUTTON)
-            return 1;
-        if (gMain.newKeys & R_BUTTON)
-            return 2;
+        if (JOY_NEW(L_BUTTON))
+            return MENU_L_PRESSED;
+        if (JOY_NEW(R_BUTTON))
+            return MENU_R_PRESSED;
     }
 
     return 0;
 }
 
-u8 sub_812210C(void)
+u8 GetLRKeysPressedAndHeld(void)
 {
     if (gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_LR)
     {
-        if (gMain.newAndRepeatedKeys & L_BUTTON)
-            return 1;
-        if (gMain.newAndRepeatedKeys & R_BUTTON)
-            return 2;
+        if (JOY_REPEAT(L_BUTTON))
+            return MENU_L_PRESSED;
+        if (JOY_REPEAT(R_BUTTON))
+            return MENU_R_PRESSED;
     }
 
     return 0;
@@ -293,7 +291,7 @@ bool8 sub_8122148(u16 itemId)
 
 bool8 itemid_80BF6D8_mail_related(u16 itemId)
 {
-    if (is_c1_link_related_active() != TRUE && InUnionRoom() != TRUE)
+    if (IsUpdateLinkStateCBActive() != TRUE && InUnionRoom() != TRUE)
         return TRUE;
     else if (ItemIsMail(itemId) != TRUE)
         return TRUE;
@@ -301,9 +299,9 @@ bool8 itemid_80BF6D8_mail_related(u16 itemId)
         return FALSE;
 }
 
-bool8 sub_81221AC(void)
+bool8 MenuHelpers_LinkSomething(void)
 {
-    if (is_c1_link_related_active() == TRUE || gReceivedRemoteLinkPlayers == 1)
+    if (IsUpdateLinkStateCBActive() == TRUE || gReceivedRemoteLinkPlayers == 1)
         return TRUE;
     else
         return FALSE;
@@ -311,13 +309,13 @@ bool8 sub_81221AC(void)
 
 static bool8 sub_81221D0(void)
 {
-    if (!sub_81221AC())
+    if (!MenuHelpers_LinkSomething())
         return FALSE;
     else
         return sub_8087598();
 }
 
-bool8 sub_81221EC(void)
+bool8 MenuHelpers_CallLinkSomething(void)
 {
     if (sub_81221D0() == TRUE)
         return TRUE;
@@ -346,17 +344,17 @@ void sub_812220C(struct ItemSlot *slots, u8 count, u8 *arg2, u8 *usedSlotsCount,
         *arg2 = (*usedSlotsCount);
 }
 
-void sub_812225C(u16 *arg0, u16 *arg1, u8 arg2, u8 arg3)
+void sub_812225C(u16 *scrollOffset, u16 *cursorPos, u8 maxShownItems, u8 numItems)
 {
-    if ((*arg0) != 0 && (*arg0) + arg2 > arg3)
-        (*arg0) = arg3 - arg2;
+    if (*scrollOffset != 0 && *scrollOffset + maxShownItems > numItems)
+        *scrollOffset = numItems - maxShownItems;
 
-    if ((*arg0) + (*arg1) >= arg3)
+    if (*scrollOffset + *cursorPos >= numItems)
     {
-        if (arg3 == 0)
-            (*arg1) = 0;
+        if (numItems == 0)
+            *cursorPos = 0;
         else
-            (*arg1) = arg3 - 1;
+            *cursorPos = numItems - 1;
     }
 }
 
@@ -394,8 +392,8 @@ void sub_8122298(u16 *arg0, u16 *arg1, u8 arg2, u8 arg3, u8 arg4)
 
 void LoadListMenuArrowsGfx(void)
 {
-    LoadCompressedObjectPic(&gUnknown_0859F514);
-    LoadCompressedObjectPalette(&gUnknown_0859F51C);
+    LoadCompressedSpriteSheet(&gUnknown_0859F514);
+    LoadCompressedSpritePalette(&gUnknown_0859F51C);
 }
 
 void sub_8122344(u8 *spriteIds, u8 count)

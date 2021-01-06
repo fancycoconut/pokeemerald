@@ -1,6 +1,6 @@
 #include "global.h"
 #include "crt0.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "link.h"
 #include "link_rfu.h"
 #include "librfu.h"
@@ -22,10 +22,7 @@
 #include "text.h"
 #include "intro.h"
 #include "main.h"
-
-extern void sub_800B9B8(void);
-extern u8 gUnknown_03002748;
-extern u32 *gUnknown_0203CF5C;
+#include "trainer_hill.h"
 
 static void VBlankIntr(void);
 static void HBlankIntr(void);
@@ -78,7 +75,7 @@ static EWRAM_DATA u16 gTrainerId = 0;
 static void UpdateLinkAndCallCallbacks(void);
 static void InitMainCallbacks(void);
 static void CallCallbacks(void);
-static void SeedRngWithRtc(void);
+//static void SeedRngWithRtc(void);
 static void ReadKeys(void);
 void InitIntrHandlers(void);
 static void WaitForVBlank(void);
@@ -88,7 +85,11 @@ void EnableVCountIntrAtLine150(void);
 
 void AgbMain()
 {
+    // Modern compilers are liberal with the stack on entry to this function,
+    // so RegisterRamReset may crash if it resets IWRAM.
+#if !MODERN
     RegisterRamReset(RESET_ALL);
+#endif //MODERN
     *(vu16 *)BG_PLTT = 0x7FFF;
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3;
@@ -96,11 +97,12 @@ void AgbMain()
     InitIntrHandlers();
     m4aSoundInit();
     EnableVCountIntrAtLine150();
-    sub_800E6D0();
+    InitRFU();
     RtcInit();
     CheckForFlashMemory();
     InitMainCallbacks();
     InitMapMusic();
+    //SeedRngWithRtc(); see comment at SeedRngWithRtc declaration below
     ClearDma3Requests();
     ResetBgs();
     SetDefaultFontsPointer();
@@ -163,7 +165,7 @@ static void UpdateLinkAndCallCallbacks(void)
 static void InitMainCallbacks(void)
 {
     gMain.vblankCounter1 = 0;
-    gUnknown_0203CF5C = NULL;
+    gTrainerHillVBlankCounter = NULL;
     gMain.vblankCounter2 = 0;
     gMain.callback1 = NULL;
     SetMainCallback2(CB2_InitCopyrightScreenAfterBootup);
@@ -211,6 +213,14 @@ void EnableVCountIntrAtLine150(void)
     EnableInterrupts(INTR_FLAG_VCOUNT);
 }
 
+// oops! FRLG commented this out to remove RTC, however Emerald didnt undo this!
+//static void SeedRngWithRtc(void)
+//{
+//    u32 seed = RtcGetMinuteCount();
+//    seed = (seed >> 16) ^ (seed & 0xFFFF);
+//    SeedRng(seed);
+//}
+
 void InitKeys(void)
 {
     gKeyRepeatContinueDelay = 5;
@@ -254,12 +264,12 @@ static void ReadKeys(void)
     gMain.heldKeys = gMain.heldKeysRaw;
 
     // Remap L to A if the L=A option is enabled.
-    if (gSaveBlock2Ptr->optionsButtonMode == 2)
+    if (gSaveBlock2Ptr->optionsButtonMode == OPTIONS_BUTTON_MODE_L_EQUALS_A)
     {
-        if (gMain.newKeys & L_BUTTON)
+        if (JOY_NEW(L_BUTTON))
             gMain.newKeys |= A_BUTTON;
 
-        if (gMain.heldKeys & L_BUTTON)
+        if (JOY_HELD(L_BUTTON))
             gMain.heldKeys |= A_BUTTON;
     }
 
@@ -313,8 +323,6 @@ void SetSerialCallback(IntrCallback callback)
     gMain.serialCallback = callback;
 }
 
-extern void CopyBufferedValuesToGpuRegs(void);
-
 static void VBlankIntr(void)
 {
     if (gWirelessCommType != 0)
@@ -324,8 +332,8 @@ static void VBlankIntr(void)
 
     gMain.vblankCounter1++;
 
-    if (gUnknown_0203CF5C && *gUnknown_0203CF5C < 0xFFFFFFFF)
-        (*gUnknown_0203CF5C)++;
+    if (gTrainerHillVBlankCounter && *gTrainerHillVBlankCounter < 0xFFFFFFFF)
+        (*gTrainerHillVBlankCounter)++;
 
     if (gMain.vblankCallback)
         gMain.vblankCallback();
@@ -343,7 +351,7 @@ static void VBlankIntr(void)
     if (!gMain.inBattle || !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_RECORDED)))
         Random();
 
-    sub_800E174();
+    UpdateWirelessStatusIndicatorSprite();
 
     INTR_CHECK |= INTR_FLAG_VBLANK;
     gMain.intrCheck |= INTR_FLAG_VBLANK;
@@ -393,14 +401,14 @@ static void WaitForVBlank(void)
         ;
 }
 
-void sub_80008DC(u32 *var)
+void SetTrainerHillVBlankCounter(u32 *counter)
 {
-    gUnknown_0203CF5C = var;
+    gTrainerHillVBlankCounter = counter;
 }
 
-void sub_80008E8(void)
+void ClearTrainerHillVBlankCounter(void)
 {
-    gUnknown_0203CF5C = NULL;
+    gTrainerHillVBlankCounter = NULL;
 }
 
 void DoSoftReset(void)

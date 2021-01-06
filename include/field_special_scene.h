@@ -10,5 +10,6 @@ void Task_HandleTruckSequence(u8 taskId);
 void ExecuteTruckSequence(void);
 void EndTruckSequence(u8);
 void sub_80C791C(void);
+void FieldCB_ShowPortholeView(void);
 
 #endif // GUARD_FIELD_SPECIAL_SCENE_H

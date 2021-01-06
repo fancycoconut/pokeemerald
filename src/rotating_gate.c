@@ -233,13 +233,13 @@ static const struct OamData sOamData_RotatingGateLarge =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_NORMAL,
-    .objMode = 0,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
     .bpp = ST_OAM_4BPP,
-    .shape = ST_OAM_SQUARE,
+    .shape = SPRITE_SHAPE(64x64),
     .x = 0,
     .matrixNum = 0,
-    .size = 3,
+    .size = SPRITE_SIZE(64x64),
     .tileNum = 0,
     .priority = 2,
     .paletteNum = 2,
@@ -250,13 +250,13 @@ static const struct OamData sOamData_RotatingGateRegular =
 {
     .y = 0,
     .affineMode = ST_OAM_AFFINE_NORMAL,
-    .objMode = 0,
+    .objMode = ST_OAM_OBJ_NORMAL,
     .mosaic = 0,
     .bpp = ST_OAM_4BPP,
-    .shape = ST_OAM_SQUARE,
+    .shape = SPRITE_SHAPE(32x32),
     .x = 0,
     .matrixNum = 0,
-    .size = 2,
+    .size = SPRITE_SIZE(32x32),
     .tileNum = 0,
     .priority = 2,
     .paletteNum = 2,
@@ -776,7 +776,7 @@ static void SpriteCallback_RotatingGate(struct Sprite *sprite)
         if (GetPlayerSpeed() != 1)
             affineAnimation += 8;
 
-        PlaySE(SE_HI_TURUN);
+        PlaySE(SE_ROTATING_GATE);
         StartSpriteAffineAnim(sprite, affineAnimation);
     }
     else if (rotationDirection == ROTATE_CLOCKWISE)
@@ -786,7 +786,7 @@ static void SpriteCallback_RotatingGate(struct Sprite *sprite)
         if (GetPlayerSpeed() != 1)
             affineAnimation += 8;
 
-        PlaySE(SE_HI_TURUN);
+        PlaySE(SE_ROTATING_GATE);
         StartSpriteAffineAnim(sprite, affineAnimation);
     }
 

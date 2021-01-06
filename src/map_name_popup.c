@@ -1,6 +1,5 @@
 #include "global.h"
-#include "constants/region_map_sections.h"
-#include "constants/weather.h"
+#include "battle_pyramid.h"
 #include "bg.h"
 #include "event_data.h"
 #include "gpu_regs.h"
@@ -9,11 +8,13 @@
 #include "map_name_popup.h"
 #include "palette.h"
 #include "region_map.h"
-#include "rom_818CFC8.h"
 #include "start_menu.h"
 #include "string_util.h"
 #include "task.h"
 #include "text.h"
+#include "constants/layouts.h"
+#include "constants/region_map_sections.h"
+#include "constants/weather.h"
 
 // enums
 enum MapPopUp_Themes
@@ -120,9 +121,9 @@ static const u8 gRegionMapSectionId_To_PopUpThemeIdMapping[] =
     [MAPSEC_ROUTE_133] = MAPPOPUP_THEME_UNDERWATER,
     [MAPSEC_ROUTE_134] = MAPPOPUP_THEME_UNDERWATER,
     [MAPSEC_UNDERWATER_124] = MAPPOPUP_THEME_STONE2,
-    [MAPSEC_UNDERWATER_125] = MAPPOPUP_THEME_STONE2,
     [MAPSEC_UNDERWATER_126] = MAPPOPUP_THEME_STONE2,
     [MAPSEC_UNDERWATER_127] = MAPPOPUP_THEME_STONE2,
+    [MAPSEC_UNDERWATER_128] = MAPPOPUP_THEME_STONE2,
     [MAPSEC_UNDERWATER_SOOTOPOLIS] = MAPPOPUP_THEME_STONE2,
     [MAPSEC_GRANITE_CAVE] = MAPPOPUP_THEME_STONE,
     [MAPSEC_MT_CHIMNEY] = MAPPOPUP_THEME_STONE,
@@ -138,7 +139,7 @@ static const u8 gRegionMapSectionId_To_PopUpThemeIdMapping[] =
     [MAPSEC_AQUA_HIDEOUT_OLD] = MAPPOPUP_THEME_STONE,
     [MAPSEC_SHOAL_CAVE] = MAPPOPUP_THEME_STONE,
     [MAPSEC_SEAFLOOR_CAVERN] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_UNDERWATER_128] = MAPPOPUP_THEME_STONE2,
+    [MAPSEC_UNDERWATER_SEAFLOOR_CAVERN] = MAPPOPUP_THEME_STONE2,
     [MAPSEC_VICTORY_ROAD] = MAPPOPUP_THEME_STONE,
     [MAPSEC_MIRAGE_ISLAND] = MAPPOPUP_THEME_WOOD,
     [MAPSEC_CAVE_OF_ORIGIN] = MAPPOPUP_THEME_STONE,
@@ -157,22 +158,22 @@ static const u8 gRegionMapSectionId_To_PopUpThemeIdMapping[] =
     [MAPSEC_SKY_PILLAR] = MAPPOPUP_THEME_STONE,
     [MAPSEC_SECRET_BASE] = MAPPOPUP_THEME_STONE,
     [MAPSEC_DYNAMIC] = MAPPOPUP_THEME_MARBLE,
-    [MAPSEC_AQUA_HIDEOUT - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_MAGMA_HIDEOUT - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_MIRAGE_TOWER - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_BIRTH_ISLAND_2 - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_FARAWAY_ISLAND - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_ARTISAN_CAVE - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_MARINE_CAVE - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_UNDERWATER_MARINE_CAVE - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE2,
-    [MAPSEC_TERRA_CAVE - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_UNDERWATER_TERRA_CAVE - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE2,
-    [MAPSEC_UNDERWATER_UNK1 - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE2,
-    [MAPSEC_UNDERWATER_129 - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE2,
-    [MAPSEC_DESERT_UNDERPASS - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_ALTERING_CAVE_2 - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_NAVEL_ROCK2 - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_STONE,
-    [MAPSEC_TRAINER_HILL - MAPSEC_SUBTRACT_KANTO] = MAPPOPUP_THEME_MARBLE
+    [MAPSEC_AQUA_HIDEOUT - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_MAGMA_HIDEOUT - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_MIRAGE_TOWER - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_BIRTH_ISLAND - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_WOOD,
+    [MAPSEC_FARAWAY_ISLAND - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_WOOD,
+    [MAPSEC_ARTISAN_CAVE - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_MARINE_CAVE - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_UNDERWATER_MARINE_CAVE - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE2,
+    [MAPSEC_TERRA_CAVE - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_UNDERWATER_105 - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE2,
+    [MAPSEC_UNDERWATER_125 - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE2,
+    [MAPSEC_UNDERWATER_129 - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE2,
+    [MAPSEC_DESERT_UNDERPASS - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_ALTERING_CAVE - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_NAVEL_ROCK - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_STONE,
+    [MAPSEC_TRAINER_HILL - KANTO_MAPSEC_COUNT] = MAPPOPUP_THEME_MARBLE
 };
 
 static const u8 gText_PyramidFloor1[] = _("PYRAMID FLOOR 1");
@@ -206,7 +207,7 @@ bool8 sub_80D47D4(void)
 
 void ShowMapNamePopup(void)
 {
-    if (FlagGet(FLAG_SPECIAL_FLAG_0x4000) != TRUE)
+    if (FlagGet(FLAG_HIDE_MAP_NAME_POPUP) != TRUE)
     {
         if (!FuncIsActiveTask(Task_MapNamePopUpWindow))
         {
@@ -275,7 +276,7 @@ static void Task_MapNamePopUpWindow(u8 taskId)
         }
         break;
     case 4:
-        sub_819746C(GetMapNamePopUpWindowId(), TRUE);
+        ClearStdWindowAndFrame(GetMapNamePopUpWindowId(), TRUE);
         task->data[0] = 5;
         break;
     case 5:
@@ -289,7 +290,7 @@ void HideMapNamePopUpWindow(void)
 {
     if (FuncIsActiveTask(Task_MapNamePopUpWindow))
     {
-        sub_819746C(GetMapNamePopUpWindowId(), TRUE);
+        ClearStdWindowAndFrame(GetMapNamePopUpWindowId(), TRUE);
         RemoveMapNamePopUpWindow();
         SetGpuReg_ForcedBlank(REG_OFFSET_BG0VOFS, 0);
         DestroyTask(sPopupTaskId);
@@ -305,7 +306,7 @@ static void ShowMapNamePopUpWindow(void)
 
     if (InBattlePyramid())
     {
-        if (gMapHeader.mapLayoutId == 0x17A)
+        if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_TOP)
         {
             withoutPrefixPtr = &(mapDisplayHeader[3]);
             mapDisplayHeaderSource = gBattlePyramid_MapHeaderStrings[7];
@@ -358,10 +359,10 @@ static void LoadMapNamePopUpWindowBg(void)
     u8 popupWindowId = GetMapNamePopUpWindowId();
     u16 regionMapSectionId = gMapHeader.regionMapSectionId;
 
-    if (regionMapSectionId > MAPSEC_DYNAMIC)
+    if (regionMapSectionId >= KANTO_MAPSEC_START)
     {
-        if (regionMapSectionId > MAPSEC_SPECIAL_AREA)
-            regionMapSectionId -= (MAPSEC_SPECIAL_AREA - MAPSEC_DYNAMIC);
+        if (regionMapSectionId > KANTO_MAPSEC_END)
+            regionMapSectionId -= KANTO_MAPSEC_COUNT;
         else
             regionMapSectionId = 0; // Discard kanto region sections;
     }
@@ -370,7 +371,7 @@ static void LoadMapNamePopUpWindowBg(void)
     LoadBgTiles(GetWindowAttribute(popupWindowId, WINDOW_BG), gMapPopUp_Outline_Table[popUpThemeId], 0x400, 0x21D);
     CallWindowFunction(popupWindowId, sub_80D4A78);
     PutWindowTilemap(popupWindowId);
-    if(gMapHeader.weather == WEATHER_BUBBLES)
+    if (gMapHeader.weather == WEATHER_UNDERWATER_BUBBLES)
         LoadPalette(&gUnknown_0857F444, 0xE0, 0x20);
     else
         LoadPalette(gMapPopUp_Palette_Table[popUpThemeId], 0xE0, 0x20);

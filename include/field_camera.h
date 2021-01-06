@@ -23,7 +23,7 @@ void DrawWholeMapView(void);
 void CurrentMapDrawMetatileAt(int x, int y);
 void sub_8089C08(s16 *a0, s16 *a1);
 void DrawDoorMetatileAt(int x, int y, u16 *arr);
-void move_tilemap_camera_to_upper_left_corner(void);
+void ResetFieldCamera(void);
 void sub_8057A58(void);
 void ResetCameraUpdateInfo(void);
 u32 InitCameraUpdateCallback(u8 a);
@@ -32,5 +32,6 @@ void SetCameraPanningCallback(void (*a)(void));
 void SetCameraPanning(s16 a, s16 b);
 void InstallCameraPanAheadCallback(void);
 void UpdateCameraPanning(void);
+void FieldUpdateBgTilemapScroll(void);
 
 #endif //GUARD_FIELD_CAMERA_H

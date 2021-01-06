@@ -16,14 +16,14 @@ enum
     BG_ANIM_SCREEN_BASE_BLOCK,
 };
 
-struct UnknownAnimStruct2
+struct BattleAnimBgData
 {
     u8 *bgTiles;
-    u16 *unk4;
-    u8 unk8;
+    u16 *bgTilemap;
+    u8 paletteId;
     u8 bgId;
     u16 tilesOffset;
-    u16 unkC;
+    u16 unused;
 };
 
 struct BattleAnimBackground
@@ -49,7 +49,7 @@ extern u8 gAnimMoveTurn;
 extern u8 gBattleAnimAttacker;
 extern u8 gBattleAnimTarget;
 extern u16 gAnimBattlerSpecies[MAX_BATTLERS_COUNT];
-extern u8 gUnknown_02038440;
+extern u8 gAnimCustomPanning;
 
 void ClearBattleAnimationVars(void);
 void DoMoveAnim(u16 move);
@@ -58,87 +58,126 @@ void DestroyAnimSprite(struct Sprite *sprite);
 void DestroyAnimVisualTask(u8 taskId);
 void DestroyAnimSoundTask(u8 taskId);
 bool8 IsBattlerSpriteVisible(u8 battlerId);
-void sub_80A438C(u8 battlerId, bool8 toBG_2, bool8 setSpriteInvisible);
+void MoveBattlerSpriteToBG(u8 battlerId, bool8 toBG_2, bool8 setSpriteInvisible);
 bool8 IsContest(void);
 s8 BattleAnimAdjustPanning(s8 pan);
 s8 BattleAnimAdjustPanning2(s8 pan);
-s16 KeepPanInRange(s16 a);
+s16 KeepPanInRange(s16 a, int oldPan);
 s16 CalculatePanIncrement(s16 sourcePan, s16 targetPan, s16 incrementPan);
 void sub_80A4720(u16 a, u16 *b, u32 c, u8 d);
 void sub_80A477C(bool8);
 
-// battle_intro.s
+// battle_intro.c
 void SetAnimBgAttribute(u8 bgId, u8 attributeId, u8 value);
 void sub_8118FBC(int bgId, u8 arg1, u8 arg2, u8 battlerPosition, u8 arg4, u8 *arg5, u16 *arg6, u16 arg7);
 void HandleIntroSlide(u8 terrainId);
 int GetAnimBgAttribute(u8 bgId, u8 attributeId);
 
-// battle_anim_80A5C6C.s
-void sub_80A6450(struct Sprite *sprite);
-void SetAverageBattlerPositions(u8 battlerId, bool8 a2, s16 *x, s16 *y);
-void move_anim_8074EE0(struct Sprite *sprite);
-void sub_80A656C(struct Sprite *sprite);
-void InitAnimSpritePos(struct Sprite *sprite, u8 a2);
-void sub_80A6980(struct Sprite *sprite, bool8 a2);
+// battle_anim_mons.c
+void TranslateSpriteInEllipseOverDuration(struct Sprite *sprite);
+void sub_80A8AEC(struct Sprite *sprite);
+void sub_80A8A6C(struct Sprite *sprite);
+void AnimWeatherBallUp(struct Sprite *sprite);
+void AnimWeatherBallDown(struct Sprite *sprite);
+void AnimSpinningSparkle(struct Sprite *sprite);
+void SetAverageBattlerPositions(u8 battlerId, bool8 respectMonPicOffsets, s16 *x, s16 *y);
+void DestroySpriteAndMatrix(struct Sprite *sprite);
+void TranslateSpriteLinearFixedPoint(struct Sprite *sprite);
+void InitSpritePosToAnimAttacker(struct Sprite *sprite, bool8 respectMonPicOffsets);
+void InitSpritePosToAnimTarget(struct Sprite *sprite, bool8 respectMonPicOffsets);
 void StartAnimLinearTranslation(struct Sprite *sprite);
 void InitAnimArcTranslation(struct Sprite *sprite);
-bool8 TranslateAnimLinear(struct Sprite *sprite);
+bool8 AnimTranslateLinear(struct Sprite *sprite);
 void TranslateAnimSpriteToTargetMonLocation(struct Sprite *sprite);
-void sub_80A8EE4(struct Sprite *sprite);
 u8 GetBattlerSpriteCoord2(u8 battlerId, u8 attributeId);
 void sub_80A6FD4(struct Sprite *sprite);
 u16 ArcTan2Neg(s16 a, s16 b);
-void sub_80A73E0(struct Sprite *sprite, bool8 a2, s16 xScale, s16 yScale, u16 rotation);
-void sub_80A67BC(struct Sprite *sprite);
-void sub_80A66DC(struct Sprite *sprite);
-void sub_80A6838(struct Sprite *sprite);
-void sub_80A67D8(struct Sprite *sprite);
-void sub_80A6864(struct Sprite *sprite, s16 a2);
-s16 sub_80A861C(u8 battlerId, u8 a2);
+void TrySetSpriteRotScale(struct Sprite *sprite, bool8 a2, s16 xScale, s16 yScale, u16 rotation);
+void RunStoredCallbackWhenAffineAnimEnds(struct Sprite *sprite);
+void TranslateSpriteLinearAndFlicker(struct Sprite *sprite);
+void SetSpriteCoordsToAnimAttackerCoords(struct Sprite *sprite);
+void RunStoredCallbackWhenAnimEnds(struct Sprite *sprite);
+void SetAnimSpriteInitialXOffset(struct Sprite *sprite, s16 a2);
+s16 GetBattlerSpriteCoordAttr(u8 battlerId, u8 a2);
 u8 GetBattlerYCoordWithElevation(u8 battlerId);
 void WaitAnimForDuration(struct Sprite *sprite);
-void sub_80A7938(struct Sprite *sprite);
+void AnimTravelDiagonally(struct Sprite *sprite);
 void InitAnimLinearTranslation(struct Sprite *sprite);
 void sub_80A6F98(struct Sprite *sprite);
-u8 sub_80A8328(u8 battlerId);
-void *sub_80A8050(s16 bottom, s16 top);
-void sub_80A8048(s16 *bottom, s16 *top, const void *ptr);
+u8 GetBattlerSpriteBGPriority(u8 battlerId);
+void *LoadPointerFromVars(s16 bottom, s16 top);
+void StorePointerInVars(s16 *bottom, s16 *top, const void *ptr);
 void sub_80A8278(void);
-void sub_80A6B30(struct UnknownAnimStruct2*);
-void sub_80A6B90(struct UnknownAnimStruct2*, u32 arg1);
-u8 sub_80A82E4(u8 battlerId);
-bool8 TranslateAnimArc(struct Sprite *sprite);
+void sub_80A6B30(struct BattleAnimBgData*);
+void sub_80A6B90(struct BattleAnimBgData*, u32 arg1);
+u8 GetBattlerSpriteSubpriority(u8 battlerId);
+bool8 TranslateAnimHorizontalArc(struct Sprite *sprite);
 void sub_80A6630(struct Sprite *sprite);
-void sub_80A6680(struct Sprite *sprite);
-void sub_80A7344(u8 spriteId);
-void obj_id_set_rotscale(u8 spriteId, s16 xScale, s16 yScale, u16 rotation);
+void TranslateMonSpriteLinearFixedPoint(struct Sprite *sprite);
+void ResetSpriteRotScale(u8 spriteId);
+void SetSpriteRotScale(u8 spriteId, s16 xScale, s16 yScale, u16 rotation);
 void InitSpriteDataForLinearTranslation(struct Sprite *sprite);
-void sub_80A7270(u8 spriteId, u8 objMode);
-void sub_80A73A0(u8 spriteId);
+void PrepareBattlerSpriteForRotScale(u8 spriteId, u8 objMode);
+void SetBattlerSpriteYOffsetFromRotation(u8 spriteId);
 u32 sub_80A75AC(u8 a1, u8 a2, u8 a3, u8 a4, u8 a5, u8 a6, u8 a7);
 u32 sub_80A76C4(u8 a1, u8 a2, u8 a3, u8 a4);
 u8 sub_80A77AC(u8 a1);
-s16 duplicate_obj_of_side_rel2move_in_transparent_mode(u8);
+s16 CloneBattlerSpriteWithBlend(u8);
 void obj_delete_but_dont_free_vram(struct Sprite*);
 u8 sub_80A89C8(int, u8, int);
-void sub_80A6D60(struct UnknownAnimStruct2*, const void*, u32);
-void sub_80A6CC0(u32, const void*, u32);
+void AnimLoadCompressedBgTilemapHandleContest(struct BattleAnimBgData*, const void*, u32);
+void AnimLoadCompressedBgGfx(u32, const u32*, u32);
 void sub_80A6DAC(bool8);
-void sub_80A634C(struct Sprite *);
+void TranslateSpriteInGrowingCircleOverDuration(struct Sprite *);
 void sub_80A653C(struct Sprite *);
-void sub_80A7E6C(u8 spriteId);
+void SetBattlerSpriteYOffsetFromYScale(u8 spriteId);
 void sub_80A805C(struct Task *task, u8 a2, s16 a3, s16 a4, s16 a5, s16 a6, u16 a7);
 u8 sub_80A80C8(struct Task *task);
-void sub_80A8EE4(struct Sprite *);
-void sub_80A67F4(struct Sprite *);
+void DestroyAnimSpriteAndDisableBlend(struct Sprite *);
+void AnimLoadCompressedBgTilemap(u32 bgId, const void *src);
+void InitAnimFastLinearTranslationWithSpeed(struct Sprite *sprite);
+bool8 AnimFastTranslateLinear(struct Sprite *sprite);
+void InitAndRunAnimFastLinearTranslation(struct Sprite *sprite);
+void TranslateMonSpriteLinear(struct Sprite *sprite);
+void TranslateSpriteLinear(struct Sprite *sprite);
+void AnimSpriteOnMonPos(struct Sprite *sprite);
+void sub_80A7000(struct Sprite *sprite);
+void TranslateSpriteInCircleOverDuration(struct Sprite *sprite);
+void SetGreyscaleOrOriginalPalette(u16 palNum, bool8 restoreOriginal);
+void PrepareAffineAnimInTaskData(struct Task *task, u8 spriteId, const union AffineAnimCmd *affineAnimCmds);
+bool8 RunAffineAnimFromTaskData(struct Task *task);
+void AnimThrowProjectile(struct Sprite *sprite);
+void sub_80A6BFC(struct BattleAnimBgData *unk, u8 unused);
+u8 sub_80A8394(u16 species, bool8 isBackpic, u8 a3, s16 x, s16 y, u8 subpriority, u32 personality, u32 trainerId, u32 battlerId, u32 a10);
+void sub_80A749C(struct Sprite *sprite);
+void TradeMenuBouncePartySprites(struct Sprite *sprite);
+void DestroyAnimVisualTaskAndDisableBlend(u8 taskId);
+void DestroySpriteAndFreeResources_(struct Sprite *sprite);
+void SetBattlerSpriteYOffsetFromOtherYScale(u8 spriteId, u8 otherSpriteId);
+u8 GetBattlerSide(u8 battler);
+u8 GetBattlerPosition(u8 battler);
+u8 GetBattlerAtPosition(u8 position);
+void sub_80A64EC(struct Sprite *sprite);
+void sub_80A718C(struct Sprite *sprite);
 
 enum
 {
     BATTLER_COORD_X,
     BATTLER_COORD_Y,
     BATTLER_COORD_X_2,
-    BATTLER_COORD_3,
-    BATTLER_COORD_4,
+    BATTLER_COORD_Y_PIC_OFFSET,
+    BATTLER_COORD_Y_PIC_OFFSET_DEFAULT,
+};
+
+enum
+{
+    BATTLER_COORD_ATTR_HEIGHT,
+    BATTLER_COORD_ATTR_WIDTH,
+    BATTLER_COORD_ATTR_TOP,
+    BATTLER_COORD_ATTR_BOTTOM,
+    BATTLER_COORD_ATTR_LEFT,
+    BATTLER_COORD_ATTR_RIGHT,
+    BATTLER_COORD_ATTR_RAW_BOTTOM,
 };
 
 u8 GetBattlerSpriteCoord(u8 battlerId, u8 attributeId);
@@ -147,15 +186,14 @@ bool8 IsBattlerSpritePresent(u8 battlerId);
 void sub_80A6C68(u32 arg0);
 u8 GetAnimBattlerSpriteId(u8 wantedBattler);
 bool8 IsDoubleBattle(void);
-u8 sub_80A6D94(void);
-u8 sub_80A8364(u8 battlerId);
+u8 GetBattleBgPaletteNum(void);
+u8 GetBattlerSpriteBGPriorityRank(u8 battlerId);
 void StoreSpriteCallbackInData6(struct Sprite *sprite, void (*spriteCallback)(struct Sprite*));
-void oamt_add_pos2_onto_pos1(struct Sprite *sprite);
+void SetSpritePrimaryCoordsFromSecondaryCoords(struct Sprite *sprite);
 u8 GetBattlerSpriteDefault_Y(u8 battlerId);
-u8 sub_80A82E4(u8 battlerId);
 u8 GetSubstituteSpriteDefault_Y(u8 battlerId);
 
-// battle_anim_80A9C70.s
+// battle_anim_status_effects.c
 #define STAT_ANIM_PLUS1  15
 #define STAT_ANIM_PLUS2  39
 #define STAT_ANIM_MINUS1 22
@@ -166,61 +204,93 @@ u8 GetSubstituteSpriteDefault_Y(u8 battlerId);
 #define STAT_ANIM_MULTIPLE_MINUS2 58
 void LaunchStatusAnimation(u8 battlerId, u8 statusAnimId);
 
-// battle_anim_8170478.s
-u8 ItemIdToBallId(u16 itemId);
-u8 LaunchBallStarsTask(u8 x, u8 y, u8 kindOfStars, u8 arg3, u8 ballId);
-u8 LaunchBallFadeMonTask(bool8 unFadeLater, u8 battlerId, u32 arg2, u8 ballId);
+// battle_anim_ground.c
+void AnimTask_HorizontalShake(u8 taskId);
 
-// battle_anim_utility_funcs.s
+// battle_anim_throw.c
+void TryShinyAnimation(u8 battler, struct Pokemon *mon);
+u8 ItemIdToBallId(u16 itemId);
+u8 AnimateBallOpenParticles(u8 x, u8 y, u8 priority, u8 subpriority, u8 ballId);
+u8 LaunchBallFadeMonTask(bool8 unFadeLater, u8 battlerId, u32 selectedPalettes, u8 ballId);
+
+// battle_anim_utility_funcs.c
 void sub_8116EB4(u8);
+void sub_8117854(u8 taskId, int unused, u16 arg2, u8 battler1, u8 arg4, u8 arg5, u8 arg6, u8 arg7, const u32 *arg8, const u32 *arg9, const u32 *palette);
+
+// battle_anim_effects_1.c
+void SetSpriteNextToMonHead(u8 battler, struct Sprite* sprite);
+void AnimMoveTwisterParticle(struct Sprite* sprite);
+void AnimParticleBurst(struct Sprite *);
+
+// battle_anim_water.c
+void AnimWaterPulseRing(struct Sprite *sprite);
+
+// battle_anim_flying.c
+void DestroyAnimSpriteAfterTimer(struct Sprite *sprite);
+
+// battle_anim_smokescreen.c
+u8 SmokescreenImpact(s16 x, s16 y, u8 a3);
 
 u32 UnpackSelectedBattleAnimPalettes(s16);
 
 u8 GetBattlerSpriteFinal_Y(u8, u16, u8);
 
-extern const struct OamData gUnknown_08524944;
-extern const struct OamData gUnknown_08524A8C;
-extern const struct OamData gUnknown_08524904;
-extern const struct OamData gUnknown_085249C4;
-extern const struct OamData gUnknown_0852490C;
-extern const struct OamData gUnknown_08524934;
-extern const struct OamData gUnknown_08524974;
-extern const struct OamData gUnknown_0852499C;
-extern const struct OamData gUnknown_085249CC;
-extern const struct OamData gUnknown_08524914;
-extern const struct OamData gUnknown_0852496C;
-extern const struct OamData gUnknown_08524A34;
-extern const struct OamData gUnknown_08524A3C;
-extern const struct OamData gUnknown_08524A94;
-extern const struct OamData gUnknown_08524954;
-extern const struct OamData gUnknown_08524AE4;
-extern const struct OamData gUnknown_085249D4;
-extern const struct OamData gUnknown_08524A9C;
-extern const struct OamData gUnknown_08524ADC;
-extern const struct OamData gUnknown_08524B14;
-extern const struct OamData gUnknown_08524A54;
-extern const struct OamData gUnknown_08524A14;
-extern const struct OamData gUnknown_08524A1C;
-extern const struct OamData gUnknown_085249BC;
-extern const struct OamData gUnknown_08524AF4;
-extern const struct OamData gUnknown_085249DC;
-extern const struct OamData gUnknown_08524AFC;
-extern const struct OamData gUnknown_08524B1C;
-extern const struct OamData gUnknown_08524A04;
-extern const struct OamData gUnknown_08524A2C;
-extern const struct OamData gUnknown_08524AEC;
-extern const struct OamData gUnknown_08524964;
-extern const struct OamData gUnknown_08524B24;
-extern const struct OamData gUnknown_08524A24;
-extern const struct OamData gUnknown_08524AC4;
-extern const struct OamData gUnknown_08524A84;
-extern const struct OamData gUnknown_08524A64;
-extern const struct OamData gUnknown_0852491C;
-extern const struct OamData gUnknown_0852495C;
-extern const struct OamData gUnknown_0852497C;
-extern const struct OamData gUnknown_085249F4;
-extern const struct OamData gUnknown_0852493C;
-extern const struct OamData gUnknown_08524A5C;
-extern const struct OamData gUnknown_08524A74;
+extern const struct OamData gOamData_AffineOff_ObjNormal_8x16;
+extern const struct OamData gOamData_AffineNormal_ObjBlend_16x16;
+extern const struct OamData gOamData_AffineOff_ObjNormal_8x8;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_8x8;
+extern const struct OamData gOamData_AffineOff_ObjNormal_16x16;
+extern const struct OamData gOamData_AffineOff_ObjNormal_32x16;
+extern const struct OamData gOamData_AffineNormal_ObjNormal_32x32;
+extern const struct OamData gOamData_AffineNormal_ObjNormal_64x32;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_16x16;
+extern const struct OamData gOamData_AffineOff_ObjNormal_32x32;
+extern const struct OamData gOamData_AffineNormal_ObjNormal_16x16;
+extern const struct OamData gOamData_AffineOff_ObjBlend_32x32;
+extern const struct OamData gOamData_AffineOff_ObjBlend_64x64;
+extern const struct OamData gOamData_AffineNormal_ObjBlend_32x32;
+extern const struct OamData gOamData_AffineOff_ObjNormal_16x32;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_8x8;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_32x32;
+extern const struct OamData gOamData_AffineNormal_ObjBlend_64x64;
+extern const struct OamData gOamData_AffineNormal_ObjBlend_32x64;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_32x16;
+extern const struct OamData gOamData_AffineOff_ObjBlend_32x16;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_16x32;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_32x64;
+extern const struct OamData gOamData_AffineNormal_ObjNormal_32x64;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_32x32;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_64x64;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_64x64;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_64x32;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_8x16;
+extern const struct OamData gOamData_AffineOff_ObjBlend_16x16;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_16x16;
+extern const struct OamData gOamData_AffineNormal_ObjNormal_8x8;
+extern const struct OamData gOamData_AffineDouble_ObjBlend_8x16;
+extern const struct OamData gOamData_AffineOff_ObjBlend_8x8;
+extern const struct OamData gOamData_AffineNormal_ObjBlend_8x16;
+extern const struct OamData gOamData_AffineNormal_ObjBlend_8x8;
+extern const struct OamData gOamData_AffineOff_ObjBlend_8x16;
+extern const struct OamData gOamData_AffineOff_ObjNormal_64x64;
+extern const struct OamData gOamData_AffineOff_ObjNormal_32x64;
+extern const struct OamData gOamData_AffineNormal_ObjNormal_64x64;
+extern const struct OamData gOamData_AffineDouble_ObjNormal_32x16;
+extern const struct OamData gOamData_AffineOff_ObjNormal_64x32;
+extern const struct OamData gOamData_AffineOff_ObjBlend_64x32;
+extern const struct OamData gOamData_AffineOff_ObjBlend_16x32;
+
+extern const struct CompressedSpriteSheet gBattleAnimPicTable[];
+extern const struct CompressedSpritePalette gBattleAnimPaletteTable[];
+
+extern const struct SpriteTemplate gWaterHitSplatSpriteTemplate;
+
+extern const union AnimCmd *const gAnims_WaterMudOrb[];
+extern const union AnimCmd *const gAnims_BasicFire[];
+extern const union AffineAnimCmd *const gGrowingRingAffineAnimTable[];
+extern const union AffineAnimCmd *const gAffineAnims_Droplet[];
+extern const union AnimCmd *const gAnims_SmallBubblePair[];
+extern const union AnimCmd *const gAnims_WaterBubble[];
+extern const union AffineAnimCmd *const gAffineAnims_Bite[];
 
 #endif // GUARD_BATTLE_ANIM_H

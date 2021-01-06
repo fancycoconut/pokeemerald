@@ -45,7 +45,7 @@ int GetMaxWidthInMenuTable(const struct MenuAction *str, int arg1)
             var = stringWidth;
     }
 
-    return convert_pixel_width_to_tile_width(var);
+    return ConvertPixelWidthToTileWidth(var);
 }
 
 int sub_81DB3D8(const struct MenuAction *str, const u8* arg1, int arg2)
@@ -59,10 +59,10 @@ int sub_81DB3D8(const struct MenuAction *str, const u8* arg1, int arg2)
             var = stringWidth;
     }
 
-    return convert_pixel_width_to_tile_width(var);
+    return ConvertPixelWidthToTileWidth(var);
 }
 
-int sub_81DB41C(const struct ListMenuTemplate *listMenu)
+int Intl_GetListMenuWidth(const struct ListMenuTemplate *listMenu)
 {
     int i, maxWidth, finalWidth;
     const struct ListMenuItem *items = listMenu->items;
@@ -93,7 +93,7 @@ void CopyMonCategoryText(int dexNum, u8 *dest)
     StringCopy(str + 1, gText_Pokemon);
 }
 
-u8 *sub_81DB494(u8 *str, int fontId, u8 *str2, int totalStringWidth)
+u8 *sub_81DB494(u8 *str, int fontId, const u8 *str2, int totalStringWidth)
 {
     u8 *buffer;
     int width;
@@ -136,7 +136,7 @@ void PadNameString(u8 *dest, u8 padChar)
         while (length < PLAYER_NAME_LENGTH - 1)
         {
             dest[length] = EXT_CTRL_CODE_BEGIN;
-            dest[length + 1] = EXT_CTRL_CODE_UNKNOWN_7;
+            dest[length + 1] = EXT_CTRL_CODE_RESET_SIZE;
             length += 2;
         }
     }

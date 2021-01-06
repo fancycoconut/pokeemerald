@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_anim.h"
 #include "recorded_battle.h"
 #include "main.h"
 #include "pokemon.h"
@@ -9,13 +10,14 @@
 #include "string_util.h"
 #include "palette.h"
 #include "save.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "util.h"
 #include "task.h"
 #include "text.h"
 #include "battle_setup.h"
 #include "frontier_util.h"
 #include "constants/trainers.h"
+#include "constants/rgb.h"
 
 #define BATTLER_RECORD_SIZE 664
 #define ILLEGAL_BATTLE_TYPES ((BATTLE_TYPE_LINK | BATTLE_TYPE_SAFARI | BATTLE_TYPE_FIRST_BATTLE                  \
@@ -35,8 +37,8 @@ struct PlayerInfo
 
 struct MovePp
 {
-    u16 moves[4];
-    u8 pp[4];
+    u16 moves[MAX_MON_MOVES];
+    u8 pp[MAX_MON_MOVES];
 };
 
 struct RecordedBattleSave
@@ -89,7 +91,7 @@ EWRAM_DATA static u32 sBattleFlags = 0;
 EWRAM_DATA static u32 sAI_Scripts = 0;
 EWRAM_DATA static struct Pokemon sSavedPlayerParty[PARTY_SIZE] = {0};
 EWRAM_DATA static struct Pokemon sSavedOpponentParty[PARTY_SIZE] = {0};
-EWRAM_DATA static u16 sPlayerMonMoves[2][4] = {0};
+EWRAM_DATA static u16 sPlayerMonMoves[2][MAX_MON_MOVES] = {0};
 EWRAM_DATA static struct PlayerInfo sPlayers[MAX_BATTLERS_COUNT] = {0};
 EWRAM_DATA static u8 sUnknown_0203CCD0 = 0;
 EWRAM_DATA static u8 sRecordMixFriendName[PLAYER_NAME_LENGTH + 1] = {0};
@@ -98,8 +100,8 @@ EWRAM_DATA static u8 sApprenticeId = 0;
 EWRAM_DATA static u16 sEasyChatSpeech[6] = {0};
 EWRAM_DATA static u8 sBattleOutcome = 0;
 
-IWRAM_DATA static u8 sRecordMixFriendLanguage;
-IWRAM_DATA static u8 sApprenticeLanguage;
+static u8 sRecordMixFriendLanguage;
+static u8 sApprenticeLanguage;
 
 // this file's functions
 static u8 sub_8185278(u8 *arg0, u8 *arg1, u8 *arg2);
@@ -124,7 +126,7 @@ void sub_8184DA4(u8 arg0)
         {
             for (j = 0; j < BATTLER_RECORD_SIZE; j++)
             {
-                sBattleRecords[i][j] |= 0xFF;
+                sBattleRecords[i][j] = 0xFF;
             }
             sBattleFlags = gBattleTypeFlags;
             sAI_Scripts = gBattleResources->ai->aiFlags;
@@ -206,7 +208,7 @@ void RecordedBattle_ClearBattlerAction(u8 battlerId, u8 bytesToClear)
     for (i = 0; i < bytesToClear; i++)
     {
         sRecordedBytesNo[battlerId]--;
-        sBattleRecords[battlerId][sRecordedBytesNo[battlerId]] |= 0xFF;
+        sBattleRecords[battlerId][sRecordedBytesNo[battlerId]] = 0xFF;
         if (sRecordedBytesNo[battlerId] == 0)
             break;
     }
@@ -219,7 +221,7 @@ u8 RecordedBattle_GetBattlerAction(u8 battlerId)
     {
         gSpecialVar_Result = gBattleOutcome = B_OUTCOME_PLAYER_TELEPORTED; // hah
         ResetPaletteFadeControl();
-        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, 0);
+        BeginNormalPaletteFade(0xFFFFFFFF, 0, 0, 0x10, RGB_BLACK);
         SetMainCallback2(CB2_QuitRecordedBattle);
         return 0xFF;
     }
@@ -321,7 +323,7 @@ static bool32 RecordedBattleToSave(struct RecordedBattleSave *battleSave, struct
 
     saveSection->checksum = CalcByteArraySum((void*)(saveSection), sizeof(*saveSection) - 4);
 
-    if (sub_8153634(31, (void*)(saveSection)) != 1)
+    if (TryWriteSpecialSaveSection(SECTOR_ID_RECORDED_BATTLE, (void*)(saveSection)) != SAVE_STATUS_OK)
         return FALSE;
     else
         return TRUE;
@@ -332,9 +334,9 @@ bool32 MoveRecordedBattleToSaveData(void)
     s32 i, j;
     bool32 ret;
     struct RecordedBattleSave *battleSave, *savSection;
-    u8 var;
+    u8 saveAttempts;
 
-    var = 0;
+    saveAttempts = 0;
     battleSave = AllocZeroed(sizeof(struct RecordedBattleSave));
     savSection = AllocZeroed(0x1000);
 
@@ -407,12 +409,12 @@ bool32 MoveRecordedBattleToSaveData(void)
 
         if (sBattleOutcome == B_OUTCOME_WON)
         {
-            for (i = 0; i < 6; i++)
+            for (i = 0; i < EASY_CHAT_BATTLE_WORDS_COUNT; i++)
                 battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->frontier.towerRecords[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_FRIEND].speechLost[i];
         }
         else
         {
-            for (i = 0; i < 6; i++)
+            for (i = 0; i < EASY_CHAT_BATTLE_WORDS_COUNT; i++)
                 battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->frontier.towerRecords[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_FRIEND].speechWon[i];
         }
         battleSave->recordMixFriendLanguage = gSaveBlock2Ptr->frontier.towerRecords[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_FRIEND].language;
@@ -425,12 +427,12 @@ bool32 MoveRecordedBattleToSaveData(void)
 
         if (sBattleOutcome == B_OUTCOME_WON)
         {
-            for (i = 0; i < 6; i++)
+            for (i = 0; i < EASY_CHAT_BATTLE_WORDS_COUNT; i++)
                 battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->frontier.towerRecords[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_FRIEND].speechLost[i];
         }
         else
         {
-            for (i = 0; i < 6; i++)
+            for (i = 0; i < EASY_CHAT_BATTLE_WORDS_COUNT; i++)
                 battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->frontier.towerRecords[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_FRIEND].speechWon[i];
         }
         battleSave->recordMixFriendLanguage = gSaveBlock2Ptr->frontier.towerRecords[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_FRIEND].language;
@@ -447,15 +449,15 @@ bool32 MoveRecordedBattleToSaveData(void)
     if (gTrainerBattleOpponent_A >= TRAINER_RECORD_MIXING_APPRENTICE)
     {
         battleSave->apprenticeId = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_APPRENTICE].id;
-        for (i = 0; i < 6; i++)
-            battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_APPRENTICE].easyChatWords[i];
+        for (i = 0; i < EASY_CHAT_BATTLE_WORDS_COUNT; i++)
+            battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_APPRENTICE].speechWon[i];
         battleSave->apprenticeLanguage = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_A - TRAINER_RECORD_MIXING_APPRENTICE].language;
     }
     else if (gTrainerBattleOpponent_B >= TRAINER_RECORD_MIXING_APPRENTICE)
     {
         battleSave->apprenticeId = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_APPRENTICE].id;
-        for (i = 0; i < 6; i++)
-            battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_APPRENTICE].easyChatWords[i];
+        for (i = 0; i < EASY_CHAT_BATTLE_WORDS_COUNT; i++)
+            battleSave->easyChatSpeech[i] = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_APPRENTICE].speechWon[i];
         battleSave->apprenticeLanguage = gSaveBlock2Ptr->apprentices[gTrainerBattleOpponent_B - TRAINER_RECORD_MIXING_APPRENTICE].language;
     }
     else if (gPartnerTrainerId >= TRAINER_RECORD_MIXING_APPRENTICE)
@@ -478,8 +480,8 @@ bool32 MoveRecordedBattleToSaveData(void)
         ret = RecordedBattleToSave(battleSave, savSection);
         if (ret == TRUE)
             break;
-        var++;
-        if (var >= 3)
+        saveAttempts++;
+        if (saveAttempts >= 3)
             break;
     }
 
@@ -490,7 +492,7 @@ bool32 MoveRecordedBattleToSaveData(void)
 
 static bool32 TryCopyRecordedBattleSaveData(struct RecordedBattleSave *dst, struct SaveSection *saveBuffer)
 {
-    if (TryCopySpecialSaveSection(SECTOR_ID_RECORDED_BATTLE, (void*)(saveBuffer)) != 1)
+    if (TryReadSpecialSaveSection(SECTOR_ID_RECORDED_BATTLE, (void*)(saveBuffer)) != SAVE_STATUS_OK)
         return FALSE;
 
     memcpy(dst, saveBuffer, sizeof(struct RecordedBattleSave));
@@ -718,7 +720,7 @@ void RecordedBattle_CopyBattlerMoves(void)
     if (sUnknown_0203C7AC == 2)
         return;
 
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < MAX_MON_MOVES; i++)
     {
         sPlayerMonMoves[gActiveBattler / 2][i] = gBattleMons[gActiveBattler].moves[i];
     }
@@ -739,17 +741,17 @@ void sub_818603C(u8 arg0)
         {
             if (arg0 == 1)
             {
-                for (j = 0; j < 4; j++)
+                for (j = 0; j < MAX_MON_MOVES; j++)
                 {
                     if (gBattleMons[battlerId].moves[j] != sPlayerMonMoves[battlerId / 2][j])
                         break;
                 }
-                if (j != 4) // player's mon's move has been changed
+                if (j != MAX_MON_MOVES) // player's mon's move has been changed
                 {
                     RecordedBattle_SetBattlerAction(battlerId, ACTION_MOVE_CHANGE);
-                    for (j = 0; j < 4; j++)
+                    for (j = 0; j < MAX_MON_MOVES; j++)
                     {
-                        for (k = 0; k < 4; k++)
+                        for (k = 0; k < MAX_MON_MOVES; k++)
                         {
                             if (gBattleMons[battlerId].moves[j] == sPlayerMonMoves[battlerId / 2][k])
                             {
@@ -764,58 +766,58 @@ void sub_818603C(u8 arg0)
             {
                 if (sBattleRecords[battlerId][sRecordedBytesNo[battlerId]] == ACTION_MOVE_CHANGE)
                 {
-                    u8 ppBonuses[4];
-                    u8 array1[4];
-                    u8 array2[4];
+                    u8 ppBonuses[MAX_MON_MOVES];
+                    u8 array1[MAX_MON_MOVES];
+                    u8 array2[MAX_MON_MOVES];
                     struct MovePp movePp;
-                    u8 array3[8];
+                    u8 array3[(MAX_MON_MOVES * 2)];
                     u8 var;
 
                     RecordedBattle_GetBattlerAction(battlerId);
-                    for (j = 0; j < 4; j++)
+                    for (j = 0; j < MAX_MON_MOVES; j++)
                     {
                         ppBonuses[j] = ((gBattleMons[battlerId].ppBonuses & ((3 << (j << 1)))) >> (j << 1));
                     }
-                    for (j = 0; j < 4; j++)
+                    for (j = 0; j < MAX_MON_MOVES; j++)
                     {
                         array1[j] = RecordedBattle_GetBattlerAction(battlerId);
                         movePp.moves[j] = gBattleMons[battlerId].moves[array1[j]];
                         movePp.pp[j] = gBattleMons[battlerId].pp[array1[j]];
                         array3[j] = ppBonuses[array1[j]];
-                        array2[j] = (gDisableStructs[battlerId].unk18_b & gBitTable[j]) >> j;
+                        array2[j] = (gDisableStructs[battlerId].mimickedMoves & gBitTable[j]) >> j;
                     }
-                    for (j = 0; j < 4; j++)
+                    for (j = 0; j < MAX_MON_MOVES; j++)
                     {
                         gBattleMons[battlerId].moves[j] = movePp.moves[j];
                         gBattleMons[battlerId].pp[j] = movePp.pp[j];
                     }
                     gBattleMons[battlerId].ppBonuses = 0;
-                    gDisableStructs[battlerId].unk18_b = 0;
-                    for (j = 0; j < 4; j++)
+                    gDisableStructs[battlerId].mimickedMoves = 0;
+                    for (j = 0; j < MAX_MON_MOVES; j++)
                     {
                         gBattleMons[battlerId].ppBonuses |= (array3[j]) << (j << 1);
-                        gDisableStructs[battlerId].unk18_b |= (array2[j]) << (j);
+                        gDisableStructs[battlerId].mimickedMoves |= (array2[j]) << (j);
                     }
 
                     if (!(gBattleMons[battlerId].status2 & STATUS2_TRANSFORMED))
                     {
-                        for (j = 0; j < 4; j++)
+                        for (j = 0; j < MAX_MON_MOVES; j++)
                         {
                             ppBonuses[j] = ((GetMonData(&gPlayerParty[gBattlerPartyIndexes[battlerId]], MON_DATA_PP_BONUSES, NULL) & ((3 << (j << 1)))) >> (j << 1));
                         }
-                        for (j = 0; j < 4; j++)
+                        for (j = 0; j < MAX_MON_MOVES; j++)
                         {
                             movePp.moves[j] = GetMonData(&gPlayerParty[gBattlerPartyIndexes[battlerId]], MON_DATA_MOVE1 + array1[j], NULL);
                             movePp.pp[j] = GetMonData(&gPlayerParty[gBattlerPartyIndexes[battlerId]], MON_DATA_PP1 + array1[j], NULL);
                             array3[j] = ppBonuses[array1[j]];
                         }
-                        for (j = 0; j < 4; j++)
+                        for (j = 0; j < MAX_MON_MOVES; j++)
                         {
                             SetMonData(&gPlayerParty[gBattlerPartyIndexes[battlerId]], MON_DATA_MOVE1 + j, &movePp.moves[j]);
                             SetMonData(&gPlayerParty[gBattlerPartyIndexes[battlerId]], MON_DATA_PP1 + j, &movePp.pp[j]);
                         }
                         var = 0;
-                        for (j = 0; j < 4; j++)
+                        for (j = 0; j < MAX_MON_MOVES; j++)
                         {
                             var |= (array3[j]) << (j << 1);
                         }
@@ -844,7 +846,7 @@ bool8 sub_8186450(void)
     return (sUnknown_0203CCD0 == 0);
 }
 
-void sub_8186468(u8 *dst)
+void GetRecordedBattleRecordMixFriendName(u8 *dst)
 {
     s32 i;
 

@@ -1,170 +1,173 @@
+.set LOCALID_WOMAN, 7
+
 LilycoveCity_DepartmentStore_5F_MapScripts:: @ 821FF7A
-	map_script 4, LilycoveCity_DepartmentStore_5F_MapScript2_21FF80
+	map_script MAP_SCRIPT_ON_WARP_INTO_MAP_TABLE, LilycoveCity_DepartmentStore_5F_OnWarp
 	.byte 0
 
-LilycoveCity_DepartmentStore_5F_MapScript2_21FF80: @ 821FF80
-	map_script_2 VAR_0x405E, 1, LilycoveCity_DepartmentStore_5F_EventScript_21FF9A
-	map_script_2 VAR_0x405E, 2, LilycoveCity_DepartmentStore_5F_EventScript_21FF9A
-	map_script_2 VAR_0x405E, 3, LilycoveCity_DepartmentStore_5F_EventScript_21FF9A
+@ During the abnormal weather from Kyogre/Groudon awakening the dept store rooftop is inaccessible
+@ Likely done to avoid dealing with showing the weather. Technically the rooftop is indoors
+LilycoveCity_DepartmentStore_5F_OnWarp: @ 821FF80
+	map_script_2 VAR_SOOTOPOLIS_CITY_STATE, 1, LilycoveCity_DepartmentStore_5F_EventScript_BlockRoofStairs
+	map_script_2 VAR_SOOTOPOLIS_CITY_STATE, 2, LilycoveCity_DepartmentStore_5F_EventScript_BlockRoofStairs
+	map_script_2 VAR_SOOTOPOLIS_CITY_STATE, 3, LilycoveCity_DepartmentStore_5F_EventScript_BlockRoofStairs
 	.2byte 0
 
-LilycoveCity_DepartmentStore_5F_EventScript_21FF9A:: @ 821FF9A
-	setobjectxy 7, 16, 2
-	turnobject 7, 2
+LilycoveCity_DepartmentStore_5F_EventScript_BlockRoofStairs:: @ 821FF9A
+	setobjectxy LOCALID_WOMAN, 16, 2
+	turnobject LOCALID_WOMAN, DIR_NORTH
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_21FFA6:: @ 821FFA6
+LilycoveCity_DepartmentStore_5F_EventScript_ClerkFarLeft:: @ 821FFA6
 	lock
 	faceplayer
-	message gUnknown_08272A21
+	message gText_HowMayIServeYou
 	waitmessage
-	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_21FFC0
-	msgbox gUnknown_08272A3F, MSGBOX_DEFAULT
+	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_Dolls
+	msgbox gText_PleaseComeAgain, MSGBOX_DEFAULT
 	release
 	end
 
 	.align 2
-LilycoveCity_DepartmentStore_5F_Pokemart_21FFC0: @ 821FFC0
-	.2byte ITEM_X_DEFEND
-	.2byte ITEM_X_SPEED
-	.2byte ITEM_X_ACCURACY
-	.2byte ITEM_SUPER_REPEL
-	.2byte 91
-	.2byte 92
-	.2byte ITEM_SUN_STONE
-	.2byte ITEM_MOON_STONE
-	.2byte ITEM_FIRE_STONE
-	.2byte ITEM_THUNDER_STONE
-	.2byte ITEM_WATER_STONE
-	.2byte ITEM_LEAF_STONE
-	.2byte ITEM_NONE
+LilycoveCity_DepartmentStore_5F_Pokemart_Dolls: @ 821FFC0
+	.2byte DECOR_PICHU_DOLL
+	.2byte DECOR_PIKACHU_DOLL
+	.2byte DECOR_MARILL_DOLL
+	.2byte DECOR_JIGGLYPUFF_DOLL
+	.2byte DECOR_DUSKULL_DOLL 
+	.2byte DECOR_WYNAUT_DOLL
+	.2byte DECOR_BALTOY_DOLL
+	.2byte DECOR_KECLEON_DOLL
+	.2byte DECOR_AZURILL_DOLL
+	.2byte DECOR_SKITTY_DOLL
+	.2byte DECOR_SWABLU_DOLL
+	.2byte DECOR_GULPIN_DOLL
+	.2byte DECOR_NONE
 	release
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_21FFDC:: @ 821FFDC
+LilycoveCity_DepartmentStore_5F_EventScript_ClerkMidLeft:: @ 821FFDC
 	lock
 	faceplayer
-	message gUnknown_08272A21
+	message gText_HowMayIServeYou
 	waitmessage
-	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_21FFF4
-	msgbox gUnknown_08272A3F, MSGBOX_DEFAULT
+	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_Cushions
+	msgbox gText_PleaseComeAgain, MSGBOX_DEFAULT
 	release
 	end
 
 	.align 2
-LilycoveCity_DepartmentStore_5F_Pokemart_21FFF4: @ 821FFF4
-	.2byte 101
-	.2byte 102
-	.2byte ITEM_BIG_MUSHROOM
-	.2byte 105
-	.2byte ITEM_PEARL
-	.2byte ITEM_BIG_PEARL
-	.2byte ITEM_STARDUST
-	.2byte ITEM_STAR_PIECE
-	.2byte ITEM_NUGGET
-	.2byte ITEM_NONE
+LilycoveCity_DepartmentStore_5F_Pokemart_Cushions: @ 821FFF4
+	.2byte DECOR_PIKA_CUSHION
+	.2byte DECOR_ROUND_CUSHION
+	.2byte DECOR_ZIGZAG_CUSHION
+	.2byte DECOR_SPIN_CUSHION
+	.2byte DECOR_DIAMOND_CUSHION
+	.2byte DECOR_BALL_CUSHION
+	.2byte DECOR_GRASS_CUSHION
+	.2byte DECOR_FIRE_CUSHION
+	.2byte DECOR_WATER_CUSHION
+	.2byte DECOR_NONE
 	release
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_22000A:: @ 822000A
+LilycoveCity_DepartmentStore_5F_EventScript_ClerkMidRight:: @ 822000A
 	lock
 	faceplayer
-	message gUnknown_08272A21
+	message gText_HowMayIServeYou
 	waitmessage
-	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_220024
-	msgbox gUnknown_08272A3F, MSGBOX_DEFAULT
+	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_Posters
+	msgbox gText_PleaseComeAgain, MSGBOX_DEFAULT
 	release
 	end
 
 	.align 2
-LilycoveCity_DepartmentStore_5F_Pokemart_220024: @ 8220024
-	.2byte ITEM_CARBOS
-	.2byte ITEM_CALCIUM
-	.2byte ITEM_RARE_CANDY
-	.2byte ITEM_PP_UP
-	.2byte ITEM_ZINC
-	.2byte ITEM_PP_MAX
-	.2byte 72
-	.2byte ITEM_GUARD_SPEC
-	.2byte ITEM_DIRE_HIT
-	.2byte ITEM_NONE
+LilycoveCity_DepartmentStore_5F_Pokemart_Posters: @ 8220024
+	.2byte DECOR_BALL_POSTER
+	.2byte DECOR_GREEN_POSTER
+	.2byte DECOR_RED_POSTER
+	.2byte DECOR_BLUE_POSTER
+	.2byte DECOR_CUTE_POSTER
+	.2byte DECOR_PIKA_POSTER
+	.2byte DECOR_LONG_POSTER
+	.2byte DECOR_SEA_POSTER
+	.2byte DECOR_SKY_POSTER
+	.2byte DECOR_NONE
 	release
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_22003A:: @ 822003A
+LilycoveCity_DepartmentStore_5F_EventScript_ClerkFarRight:: @ 822003A
 	lock
 	faceplayer
-	message gUnknown_08272A21
+	message gText_HowMayIServeYou
 	waitmessage
-	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_220054
-	msgbox gUnknown_08272A3F, MSGBOX_DEFAULT
+	pokemartdecoration2 LilycoveCity_DepartmentStore_5F_Pokemart_Mats
+	msgbox gText_PleaseComeAgain, MSGBOX_DEFAULT
 	release
 	end
 
 	.align 2
-LilycoveCity_DepartmentStore_5F_Pokemart_220054: @ 8220054
-	.2byte 59
-	.2byte 60
-	.2byte 61
-	.2byte 62
-	.2byte ITEM_HP_UP
-	.2byte ITEM_PROTEIN
-	.2byte ITEM_IRON
-	.2byte ITEM_RED_SHARD
-	.2byte ITEM_BLUE_SHARD
-	.2byte ITEM_YELLOW_SHARD
-	.2byte ITEM_NONE
+LilycoveCity_DepartmentStore_5F_Pokemart_Mats: @ 8220054
+	.2byte DECOR_SURF_MAT
+	.2byte DECOR_THUNDER_MAT
+	.2byte DECOR_FIRE_BLAST_MAT
+	.2byte DECOR_POWDER_SNOW_MAT
+	.2byte DECOR_ATTRACT_MAT
+	.2byte DECOR_FISSURE_MAT
+	.2byte DECOR_SPIKES_MAT
+	.2byte DECOR_GLITTER_MAT
+	.2byte DECOR_JUMP_MAT
+	.2byte DECOR_SPIN_MAT
+	.2byte DECOR_NONE
 	release
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_22006C:: @ 822006C
-	msgbox LilycoveCity_DepartmentStore_5F_Text_2200C5, MSGBOX_NPC
+LilycoveCity_DepartmentStore_5F_EventScript_PokefanF:: @ 822006C
+	msgbox LilycoveCity_DepartmentStore_5F_Text_PlaceFullOfCuteDolls, MSGBOX_NPC
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_220075:: @ 8220075
+LilycoveCity_DepartmentStore_5F_EventScript_Woman:: @ 8220075
 	lockall
-	applymovement 7, LilycoveCity_DepartmentStore_5F_Movement_27259E
+	applymovement LOCALID_WOMAN, Common_Movement_FacePlayer
 	waitmovement 0
-	compare VAR_0x405E, 0
-	goto_eq LilycoveCity_DepartmentStore_5F_EventScript_22009C
-	compare VAR_0x405E, 4
-	goto_if 4, LilycoveCity_DepartmentStore_5F_EventScript_22009C
-	goto LilycoveCity_DepartmentStore_5F_EventScript_2200A7
+	compare VAR_SOOTOPOLIS_CITY_STATE, 0
+	goto_if_eq LilycoveCity_DepartmentStore_5F_EventScript_WomanNormal
+	compare VAR_SOOTOPOLIS_CITY_STATE, 4
+	goto_if_ge LilycoveCity_DepartmentStore_5F_EventScript_WomanNormal
+	goto LilycoveCity_DepartmentStore_5F_EventScript_WomanLegendaryWeather
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_22009C:: @ 822009C
-	msgbox LilycoveCity_DepartmentStore_5F_Text_22016B, MSGBOX_DEFAULT
+LilycoveCity_DepartmentStore_5F_EventScript_WomanNormal:: @ 822009C
+	msgbox LilycoveCity_DepartmentStore_5F_Text_SellManyCuteMatsHere, MSGBOX_DEFAULT
 	closemessage
 	releaseall
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_2200A7:: @ 82200A7
-	msgbox LilycoveCity_DepartmentStore_5F_Text_2201C4, MSGBOX_DEFAULT
+LilycoveCity_DepartmentStore_5F_EventScript_WomanLegendaryWeather:: @ 82200A7
+	msgbox LilycoveCity_DepartmentStore_5F_Text_ClosedRooftopForWeather, MSGBOX_DEFAULT
 	closemessage
-	applymovement 7, LilycoveCity_DepartmentStore_5F_Movement_2725A6
+	applymovement LOCALID_WOMAN, Common_Movement_WalkInPlaceFastestUp
 	waitmovement 0
 	releaseall
 	end
 
-LilycoveCity_DepartmentStore_5F_EventScript_2200BC:: @ 82200BC
-	msgbox LilycoveCity_DepartmentStore_5F_Text_220122, MSGBOX_NPC
+LilycoveCity_DepartmentStore_5F_EventScript_LittleGirl:: @ 82200BC
+	msgbox LilycoveCity_DepartmentStore_5F_Text_GettingDollInsteadOfPokemon, MSGBOX_NPC
 	end
 
-LilycoveCity_DepartmentStore_5F_Text_2200C5: @ 82200C5
+LilycoveCity_DepartmentStore_5F_Text_PlaceFullOfCuteDolls: @ 82200C5
 	.string "This place is full of cute DOLLS.\p"
 	.string "I should buy some for me, instead of\n"
 	.string "just for my children.$"
 
-LilycoveCity_DepartmentStore_5F_Text_220122: @ 8220122
+LilycoveCity_DepartmentStore_5F_Text_GettingDollInsteadOfPokemon: @ 8220122
 	.string "I'm not big enough to raise POKéMON,\n"
 	.string "so I'm getting a cute DOLL instead.$"
 
-LilycoveCity_DepartmentStore_5F_Text_22016B: @ 822016B
+LilycoveCity_DepartmentStore_5F_Text_SellManyCuteMatsHere: @ 822016B
 	.string "They sell many cute MATS here.\p"
 	.string "I wonder which one I should get?\n"
 	.string "Maybe I'll buy them all…$"
 
-LilycoveCity_DepartmentStore_5F_Text_2201C4: @ 82201C4
+LilycoveCity_DepartmentStore_5F_Text_ClosedRooftopForWeather: @ 82201C4
 	.string "I think they closed the rooftop\n"
 	.string "because the weather is wild today.$"
-

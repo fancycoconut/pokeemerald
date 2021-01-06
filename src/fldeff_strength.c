@@ -2,8 +2,8 @@
 #include "event_data.h"
 #include "event_scripts.h"
 #include "field_effect.h"
+#include "fldeff.h"
 #include "party_menu.h"
-#include "rom6.h"
 #include "script.h"
 #include "string_util.h"
 #include "task.h"
@@ -11,38 +11,39 @@
 #include "constants/field_effects.h"
 
 // static functions
-static void FldEff_UseStrength(void);
-static void sub_8145E74(void);
+static void FieldCallback_Strength(void);
+static void StartStrengthFieldEffect(void);
 
 // text
 bool8 SetUpFieldMove_Strength(void)
 {
-    if (CheckObjectGraphicsInFrontOfPlayer(EVENT_OBJ_GFX_PUSHABLE_BOULDER) == TRUE)
+    if (CheckObjectGraphicsInFrontOfPlayer(OBJ_EVENT_GFX_PUSHABLE_BOULDER) == TRUE)
     {
         gSpecialVar_Result = GetCursorSelectionMonId();
         gFieldCallback2 = FieldCallback_PrepareFadeInFromMenu;
-        gPostMenuFieldCallback = FldEff_UseStrength;
+        gPostMenuFieldCallback = FieldCallback_Strength;
         return TRUE;
     }
     return FALSE;
 }
 
-static void FldEff_UseStrength(void)
+static void FieldCallback_Strength(void)
 {
     gFieldEffectArguments[0] = GetCursorSelectionMonId();
-    ScriptContext1_SetupScript(FieryPath_EventScript_2908FD);
+    ScriptContext1_SetupScript(EventScript_UseStrength);
 }
 
-bool8 sub_8145E2C(void)
+bool8 FldEff_UseStrength(void)
 {
-    u8 taskId = oei_task_add();
-    gTasks[taskId].data[8] = (u32)sub_8145E74 >> 16;
-    gTasks[taskId].data[9] = (u32)sub_8145E74;
+    u8 taskId = CreateFieldMoveTask();
+    gTasks[taskId].data[8] = (u32)StartStrengthFieldEffect >> 16;
+    gTasks[taskId].data[9] = (u32)StartStrengthFieldEffect;
     GetMonNickname(&gPlayerParty[gFieldEffectArguments[0]], gStringVar1);
     return FALSE;
 }
 
-static void sub_8145E74(void)
+// Just passes control back to EventScript_UseStrength
+static void StartStrengthFieldEffect(void)
 {
     FieldEffectActiveListRemove(FLDEFF_USE_STRENGTH);
     EnableBothScriptContexts();

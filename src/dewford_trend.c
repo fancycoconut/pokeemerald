@@ -3,7 +3,7 @@
 #include "easy_chat.h"
 #include "event_data.h"
 #include "link.h"
-#include "alloc.h"
+#include "malloc.h"
 #include "random.h"
 #include "text.h"
 #include "tv.h"
@@ -25,12 +25,12 @@ void InitDewfordTrend(void)
 
     for (i = 0; i < 5; i++)
     {
-        gSaveBlock1Ptr->easyChatPairs[i].words[0] = sub_811EE38(EC_GROUP_CONDITIONS);
+        gSaveBlock1Ptr->easyChatPairs[i].words[0] = GetRandomEasyChatWordFromGroup(EC_GROUP_CONDITIONS);
 
         if (Random() & 1)
-            gSaveBlock1Ptr->easyChatPairs[i].words[1] = sub_811EE38(EC_GROUP_LIFESTYLE);
+            gSaveBlock1Ptr->easyChatPairs[i].words[1] = GetRandomEasyChatWordFromGroup(EC_GROUP_LIFESTYLE);
         else
-            gSaveBlock1Ptr->easyChatPairs[i].words[1] = sub_811EE38(EC_GROUP_HOBBIES);
+            gSaveBlock1Ptr->easyChatPairs[i].words[1] = GetRandomEasyChatWordFromGroup(EC_GROUP_HOBBIES);
 
         gSaveBlock1Ptr->easyChatPairs[i].unk1_6 = Random() & 1;
         sub_8122B28(&(gSaveBlock1Ptr->easyChatPairs[i]));
@@ -159,7 +159,7 @@ static void sub_8122804(struct EasyChatPair *s, u16 b, u8 c)
     }
 }
 
-void ReceiveEasyChatPairsData(void *a, u32 b, u8 unused)
+void ReceiveEasyChatPairsData(struct EasyChatPair *a, size_t size, u8 unused)
 {
     u16 i, j, r3, players;
     struct EasyChatPair *buffer1, *buffer2, *src, *dst, *foo_of_buffer2;
@@ -176,7 +176,7 @@ void ReceiveEasyChatPairsData(void *a, u32 b, u8 unused)
         {
             players = GetLinkPlayerCount();
             for (i = 0; i < players; i++)
-                memcpy(&(buffer1[i * 5]), (u8 *)a + i * b, 40);
+                memcpy(&(buffer1[i * 5]), (u8 *)a + i * size, 40);
             src = buffer1;
             dst = buffer2;
             r3 = 0;
@@ -222,13 +222,18 @@ void BufferTrendyPhraseString(void)
 void TrendyPhraseIsOld(void)
 {
     u16 result = 0;
-
-    if (gSaveBlock1Ptr->easyChatPairs[0].unk0_0 - gSaveBlock1Ptr->easyChatPairs[1].unk0_0 < 2)
+    
+    do
     {
-        asm("":::"r2"); //Force the compiler to store address of gSaveBlock1 in r3 instead of r2
-        if (!gSaveBlock1Ptr->easyChatPairs[0].unk1_6 && gSaveBlock1Ptr->easyChatPairs[1].unk1_6)
-            result = 1;
-    }
+        if (gSaveBlock1Ptr->easyChatPairs[0].unk0_0 - gSaveBlock1Ptr->easyChatPairs[1].unk0_0 > 1)
+            break;
+        if (gSaveBlock1Ptr->easyChatPairs[0].unk1_6)
+            break;
+        if (!gSaveBlock1Ptr->easyChatPairs[1].unk1_6)
+            break;
+        result = 1;
+    } while (0);
+    
     gSpecialVar_Result = result;
 }
 

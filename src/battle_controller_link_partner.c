@@ -6,15 +6,17 @@
 #include "battle_interface.h"
 #include "battle_message.h"
 #include "battle_setup.h"
+#include "battle_tower.h"
 #include "battle_tv.h"
 #include "bg.h"
-#include "data2.h"
+#include "data.h"
 #include "link.h"
 #include "main.h"
 #include "m4a.h"
 #include "palette.h"
 #include "pokeball.h"
 #include "pokemon.h"
+#include "recorded_battle.h"
 #include "reshow_battle_screen.h"
 #include "sound.h"
 #include "string_util.h"
@@ -25,13 +27,7 @@
 #include "constants/battle_anim.h"
 #include "constants/songs.h"
 #include "constants/trainers.h"
-
-extern const struct CompressedSpritePalette gTrainerFrontPicPaletteTable[];
-extern const struct CompressedSpritePalette gTrainerBackPicPaletteTable[];
-
-extern void sub_8172EF0(u8 battlerId, struct Pokemon *mon);
-extern void sub_81851A8(u8 *);
-extern u8 GetFrontierTrainerFrontSpriteId(u16 trainerId);
+#include "recorded_battle.h"
 
 // this file's functions
 static void LinkPartnerHandleGetMonData(void);
@@ -71,10 +67,10 @@ static void LinkPartnerHandleTwoReturnValues(void);
 static void LinkPartnerHandleChosenMonReturnValue(void);
 static void LinkPartnerHandleOneReturnValue(void);
 static void LinkPartnerHandleOneReturnValue_Duplicate(void);
-static void LinkPartnerHandleCmd37(void);
-static void LinkPartnerHandleCmd38(void);
-static void LinkPartnerHandleCmd39(void);
-static void LinkPartnerHandleCmd40(void);
+static void LinkPartnerHandleClearUnkVar(void);
+static void LinkPartnerHandleSetUnkVar(void);
+static void LinkPartnerHandleClearUnkFlag(void);
+static void LinkPartnerHandleToggleUnkFlag(void);
 static void LinkPartnerHandleHitAnimation(void);
 static void LinkPartnerHandleCmd42(void);
 static void LinkPartnerHandlePlaySE(void);
@@ -90,7 +86,7 @@ static void LinkPartnerHandleBattleAnimation(void);
 static void LinkPartnerHandleLinkStandbyMsg(void);
 static void LinkPartnerHandleResetActionMoveSelection(void);
 static void LinkPartnerHandleCmd55(void);
-static void nullsub_113(void);
+static void LinkPartnerCmdEnd(void);
 
 static void LinkPartnerBufferRunCommand(void);
 static void LinkPartnerBufferExecCompleted(void);
@@ -105,66 +101,66 @@ static void sub_814DE9C(void);
 
 static void (*const sLinkPartnerBufferCommands[CONTROLLER_CMDS_COUNT])(void) =
 {
-    LinkPartnerHandleGetMonData,
-    LinkPartnerHandleGetRawMonData,
-    LinkPartnerHandleSetMonData,
-    LinkPartnerHandleSetRawMonData,
-    LinkPartnerHandleLoadMonSprite,
-    LinkPartnerHandleSwitchInAnim,
-    LinkPartnerHandleReturnMonToBall,
-    LinkPartnerHandleDrawTrainerPic,
-    LinkPartnerHandleTrainerSlide,
-    LinkPartnerHandleTrainerSlideBack,
-    LinkPartnerHandleFaintAnimation,
-    LinkPartnerHandlePaletteFade,
-    LinkPartnerHandleSuccessBallThrowAnim,
-    LinkPartnerHandleBallThrowAnim,
-    LinkPartnerHandlePause,
-    LinkPartnerHandleMoveAnimation,
-    LinkPartnerHandlePrintString,
-    LinkPartnerHandlePrintSelectionString,
-    LinkPartnerHandleChooseAction,
-    LinkPartnerHandleUnknownYesNoBox,
-    LinkPartnerHandleChooseMove,
-    LinkPartnerHandleChooseItem,
-    LinkPartnerHandleChoosePokemon,
-    LinkPartnerHandleCmd23,
-    LinkPartnerHandleHealthBarUpdate,
-    LinkPartnerHandleExpUpdate,
-    LinkPartnerHandleStatusIconUpdate,
-    LinkPartnerHandleStatusAnimation,
-    LinkPartnerHandleStatusXor,
-    LinkPartnerHandleDataTransfer,
-    LinkPartnerHandleDMA3Transfer,
-    LinkPartnerHandlePlayBGM,
-    LinkPartnerHandleCmd32,
-    LinkPartnerHandleTwoReturnValues,
-    LinkPartnerHandleChosenMonReturnValue,
-    LinkPartnerHandleOneReturnValue,
-    LinkPartnerHandleOneReturnValue_Duplicate,
-    LinkPartnerHandleCmd37,
-    LinkPartnerHandleCmd38,
-    LinkPartnerHandleCmd39,
-    LinkPartnerHandleCmd40,
-    LinkPartnerHandleHitAnimation,
-    LinkPartnerHandleCmd42,
-    LinkPartnerHandlePlaySE,
-    LinkPartnerHandlePlayFanfareOrBGM,
-    LinkPartnerHandleFaintingCry,
-    LinkPartnerHandleIntroSlide,
-    LinkPartnerHandleIntroTrainerBallThrow,
-    LinkPartnerHandleDrawPartyStatusSummary,
-    LinkPartnerHandleHidePartyStatusSummary,
-    LinkPartnerHandleEndBounceEffect,
-    LinkPartnerHandleSpriteInvisibility,
-    LinkPartnerHandleBattleAnimation,
-    LinkPartnerHandleLinkStandbyMsg,
-    LinkPartnerHandleResetActionMoveSelection,
-    LinkPartnerHandleCmd55,
-    nullsub_113
+    [CONTROLLER_GETMONDATA]               = LinkPartnerHandleGetMonData,
+    [CONTROLLER_GETRAWMONDATA]            = LinkPartnerHandleGetRawMonData,
+    [CONTROLLER_SETMONDATA]               = LinkPartnerHandleSetMonData,
+    [CONTROLLER_SETRAWMONDATA]            = LinkPartnerHandleSetRawMonData,
+    [CONTROLLER_LOADMONSPRITE]            = LinkPartnerHandleLoadMonSprite,
+    [CONTROLLER_SWITCHINANIM]             = LinkPartnerHandleSwitchInAnim,
+    [CONTROLLER_RETURNMONTOBALL]          = LinkPartnerHandleReturnMonToBall,
+    [CONTROLLER_DRAWTRAINERPIC]           = LinkPartnerHandleDrawTrainerPic,
+    [CONTROLLER_TRAINERSLIDE]             = LinkPartnerHandleTrainerSlide,
+    [CONTROLLER_TRAINERSLIDEBACK]         = LinkPartnerHandleTrainerSlideBack,
+    [CONTROLLER_FAINTANIMATION]           = LinkPartnerHandleFaintAnimation,
+    [CONTROLLER_PALETTEFADE]              = LinkPartnerHandlePaletteFade,
+    [CONTROLLER_SUCCESSBALLTHROWANIM]     = LinkPartnerHandleSuccessBallThrowAnim,
+    [CONTROLLER_BALLTHROWANIM]            = LinkPartnerHandleBallThrowAnim,
+    [CONTROLLER_PAUSE]                    = LinkPartnerHandlePause,
+    [CONTROLLER_MOVEANIMATION]            = LinkPartnerHandleMoveAnimation,
+    [CONTROLLER_PRINTSTRING]              = LinkPartnerHandlePrintString,
+    [CONTROLLER_PRINTSTRINGPLAYERONLY]    = LinkPartnerHandlePrintSelectionString,
+    [CONTROLLER_CHOOSEACTION]             = LinkPartnerHandleChooseAction,
+    [CONTROLLER_UNKNOWNYESNOBOX]          = LinkPartnerHandleUnknownYesNoBox,
+    [CONTROLLER_CHOOSEMOVE]               = LinkPartnerHandleChooseMove,
+    [CONTROLLER_OPENBAG]                  = LinkPartnerHandleChooseItem,
+    [CONTROLLER_CHOOSEPOKEMON]            = LinkPartnerHandleChoosePokemon,
+    [CONTROLLER_23]                       = LinkPartnerHandleCmd23,
+    [CONTROLLER_HEALTHBARUPDATE]          = LinkPartnerHandleHealthBarUpdate,
+    [CONTROLLER_EXPUPDATE]                = LinkPartnerHandleExpUpdate,
+    [CONTROLLER_STATUSICONUPDATE]         = LinkPartnerHandleStatusIconUpdate,
+    [CONTROLLER_STATUSANIMATION]          = LinkPartnerHandleStatusAnimation,
+    [CONTROLLER_STATUSXOR]                = LinkPartnerHandleStatusXor,
+    [CONTROLLER_DATATRANSFER]             = LinkPartnerHandleDataTransfer,
+    [CONTROLLER_DMA3TRANSFER]             = LinkPartnerHandleDMA3Transfer,
+    [CONTROLLER_PLAYBGM]                  = LinkPartnerHandlePlayBGM,
+    [CONTROLLER_32]                       = LinkPartnerHandleCmd32,
+    [CONTROLLER_TWORETURNVALUES]          = LinkPartnerHandleTwoReturnValues,
+    [CONTROLLER_CHOSENMONRETURNVALUE]     = LinkPartnerHandleChosenMonReturnValue,
+    [CONTROLLER_ONERETURNVALUE]           = LinkPartnerHandleOneReturnValue,
+    [CONTROLLER_ONERETURNVALUE_DUPLICATE] = LinkPartnerHandleOneReturnValue_Duplicate,
+    [CONTROLLER_CLEARUNKVAR]              = LinkPartnerHandleClearUnkVar,
+    [CONTROLLER_SETUNKVAR]                = LinkPartnerHandleSetUnkVar,
+    [CONTROLLER_CLEARUNKFLAG]             = LinkPartnerHandleClearUnkFlag,
+    [CONTROLLER_TOGGLEUNKFLAG]            = LinkPartnerHandleToggleUnkFlag,
+    [CONTROLLER_HITANIMATION]             = LinkPartnerHandleHitAnimation,
+    [CONTROLLER_42]                       = LinkPartnerHandleCmd42,
+    [CONTROLLER_PLAYSE]                   = LinkPartnerHandlePlaySE,
+    [CONTROLLER_PLAYFANFAREORBGM]         = LinkPartnerHandlePlayFanfareOrBGM,
+    [CONTROLLER_FAINTINGCRY]              = LinkPartnerHandleFaintingCry,
+    [CONTROLLER_INTROSLIDE]               = LinkPartnerHandleIntroSlide,
+    [CONTROLLER_INTROTRAINERBALLTHROW]    = LinkPartnerHandleIntroTrainerBallThrow,
+    [CONTROLLER_DRAWPARTYSTATUSSUMMARY]   = LinkPartnerHandleDrawPartyStatusSummary,
+    [CONTROLLER_HIDEPARTYSTATUSSUMMARY]   = LinkPartnerHandleHidePartyStatusSummary,
+    [CONTROLLER_ENDBOUNCE]                = LinkPartnerHandleEndBounceEffect,
+    [CONTROLLER_SPRITEINVISIBILITY]       = LinkPartnerHandleSpriteInvisibility,
+    [CONTROLLER_BATTLEANIMATION]          = LinkPartnerHandleBattleAnimation,
+    [CONTROLLER_LINKSTANDBYMSG]           = LinkPartnerHandleLinkStandbyMsg,
+    [CONTROLLER_RESETACTIONMOVESELECTION] = LinkPartnerHandleResetActionMoveSelection,
+    [CONTROLLER_55]                       = LinkPartnerHandleCmd55,
+    [CONTROLLER_TERMINATOR_NOP]           = LinkPartnerCmdEnd
 };
 
-static void nullsub_112(void)
+static void SpriteCB_Null2(void)
 {
 }
 
@@ -363,10 +359,10 @@ static void sub_814B554(void)
 
 static void sub_814B5A8(void)
 {
-    if (gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].field_1_x1)
+    if (gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].finishedShinyMonAnim)
     {
-        gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].flag_x80 = 0;
-        gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].field_1_x1 = 0;
+        gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].triedShinyMonAnim = FALSE;
+        gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].finishedShinyMonAnim = FALSE;
 
         FreeSpriteTilesByTag(0x27F9);
         FreeSpritePaletteByTag(0x27F9);
@@ -384,10 +380,10 @@ static void sub_814B5A8(void)
 
 static void sub_814B69C(void)
 {
-    if (!gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].flag_x80
+    if (!gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].triedShinyMonAnim
         && !gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].ballAnimActive)
     {
-        sub_8172EF0(gActiveBattler, &gPlayerParty[gBattlerPartyIndexes[gActiveBattler]]);
+        TryShinyAnimation(gActiveBattler, &gPlayerParty[gBattlerPartyIndexes[gActiveBattler]]);
     }
 
     if (gSprites[gUnknown_03005D7C[gActiveBattler]].callback == SpriteCallbackDummy
@@ -466,7 +462,7 @@ static u32 CopyLinkPartnerMonData(u8 monId, u8 *dst)
     case REQUEST_ALL_BATTLE:
         battleMon.species = GetMonData(&gPlayerParty[monId], MON_DATA_SPECIES);
         battleMon.item = GetMonData(&gPlayerParty[monId], MON_DATA_HELD_ITEM);
-        for (size = 0; size < 4; size++)
+        for (size = 0; size < MAX_MON_MOVES; size++)
         {
             battleMon.moves[size] = GetMonData(&gPlayerParty[monId], MON_DATA_MOVE1 + size);
             battleMon.pp[size] = GetMonData(&gPlayerParty[monId], MON_DATA_PP1 + size);
@@ -491,7 +487,7 @@ static u32 CopyLinkPartnerMonData(u8 monId, u8 *dst)
         battleMon.spAttack = GetMonData(&gPlayerParty[monId], MON_DATA_SPATK);
         battleMon.spDefense = GetMonData(&gPlayerParty[monId], MON_DATA_SPDEF);
         battleMon.isEgg = GetMonData(&gPlayerParty[monId], MON_DATA_IS_EGG);
-        battleMon.altAbility = GetMonData(&gPlayerParty[monId], MON_DATA_ALT_ABILITY);
+        battleMon.abilityNum = GetMonData(&gPlayerParty[monId], MON_DATA_ABILITY_NUM);
         battleMon.otId = GetMonData(&gPlayerParty[monId], MON_DATA_OT_ID);
         GetMonData(&gPlayerParty[monId], MON_DATA_NICKNAME, nickname);
         StringCopy10(battleMon.nickname, nickname);
@@ -513,7 +509,7 @@ static u32 CopyLinkPartnerMonData(u8 monId, u8 *dst)
         size = 2;
         break;
     case REQUEST_MOVES_PP_BATTLE:
-        for (size = 0; size < 4; size++)
+        for (size = 0; size < MAX_MON_MOVES; size++)
         {
             moveData.moves[size] = GetMonData(&gPlayerParty[monId], MON_DATA_MOVE1 + size);
             moveData.pp[size] = GetMonData(&gPlayerParty[monId], MON_DATA_PP1 + size);
@@ -533,7 +529,7 @@ static u32 CopyLinkPartnerMonData(u8 monId, u8 *dst)
         size = 2;
         break;
     case REQUEST_PP_DATA_BATTLE:
-        for (size = 0; size < 4; size++)
+        for (size = 0; size < MAX_MON_MOVES; size++)
             dst[size] = GetMonData(&gPlayerParty[monId], MON_DATA_PP1 + size);
         dst[size] = GetMonData(&gPlayerParty[monId], MON_DATA_PP_BONUSES);
         size++;
@@ -798,7 +794,7 @@ static void SetLinkPartnerMonData(u8 monId)
 
             SetMonData(&gPlayerParty[monId], MON_DATA_SPECIES, &battlePokemon->species);
             SetMonData(&gPlayerParty[monId], MON_DATA_HELD_ITEM, &battlePokemon->item);
-            for (i = 0; i < 4; i++)
+            for (i = 0; i < MAX_MON_MOVES; i++)
             {
                 SetMonData(&gPlayerParty[monId], MON_DATA_MOVE1 + i, &battlePokemon->moves[i]);
                 SetMonData(&gPlayerParty[monId], MON_DATA_PP1 + i, &battlePokemon->pp[i]);
@@ -837,7 +833,7 @@ static void SetLinkPartnerMonData(u8 monId)
         SetMonData(&gPlayerParty[monId], MON_DATA_HELD_ITEM, &gBattleBufferA[gActiveBattler][3]);
         break;
     case REQUEST_MOVES_PP_BATTLE:
-        for (i = 0; i < 4; i++)
+        for (i = 0; i < MAX_MON_MOVES; i++)
         {
             SetMonData(&gPlayerParty[monId], MON_DATA_MOVE1 + i, &moveData->moves[i]);
             SetMonData(&gPlayerParty[monId], MON_DATA_PP1 + i, &moveData->pp[i]);
@@ -1024,7 +1020,7 @@ static void LinkPartnerHandleLoadMonSprite(void)
     gBattlerSpriteIds[gActiveBattler] = CreateSprite(&gMultiuseSpriteTemplate,
                                                GetBattlerSpriteCoord(gActiveBattler, 2),
                                                GetBattlerSpriteDefault_Y(gActiveBattler),
-                                               sub_80A82E4(gActiveBattler));
+                                               GetBattlerSpriteSubpriority(gActiveBattler));
     gSprites[gBattlerSpriteIds[gActiveBattler]].pos2.x = -240;
     gSprites[gBattlerSpriteIds[gActiveBattler]].data[0] = gActiveBattler;
     gSprites[gBattlerSpriteIds[gActiveBattler]].oam.paletteNum = gActiveBattler;
@@ -1055,7 +1051,7 @@ static void sub_814CC98(u8 battlerId, bool8 dontClearSubstituteBit)
       &gMultiuseSpriteTemplate,
       GetBattlerSpriteCoord(battlerId, 2),
       GetBattlerSpriteDefault_Y(battlerId),
-      sub_80A82E4(battlerId));
+      GetBattlerSpriteSubpriority(battlerId));
 
     gSprites[gUnknown_03005D7C[battlerId]].data[1] = gBattlerSpriteIds[battlerId];
     gSprites[gUnknown_03005D7C[battlerId]].data[2] = battlerId;
@@ -1143,7 +1139,7 @@ static void LinkPartnerHandleDrawTrainerPic(void)
 
     DecompressTrainerBackPic(trainerPicId, gActiveBattler);
     SetMultiuseSpriteTemplateToTrainerBack(trainerPicId, GetBattlerPosition(gActiveBattler));
-    gBattlerSpriteIds[gActiveBattler] = CreateSprite(&gMultiuseSpriteTemplate, xPos, (8 - gTrainerBackPicCoords[trainerPicId].coords) * 4 + 80, sub_80A82E4(gActiveBattler));
+    gBattlerSpriteIds[gActiveBattler] = CreateSprite(&gMultiuseSpriteTemplate, xPos, (8 - gTrainerBackPicCoords[trainerPicId].size) * 4 + 80, GetBattlerSpriteSubpriority(gActiveBattler));
 
     gSprites[gBattlerSpriteIds[gActiveBattler]].oam.paletteNum = gActiveBattler;
     gSprites[gBattlerSpriteIds[gActiveBattler]].pos2.x = 240;
@@ -1160,7 +1156,7 @@ static void LinkPartnerHandleTrainerSlide(void)
 
 static void LinkPartnerHandleTrainerSlideBack(void)
 {
-    oamt_add_pos2_onto_pos1(&gSprites[gBattlerSpriteIds[gActiveBattler]]);
+    SetSpritePrimaryCoordsFromSecondaryCoords(&gSprites[gBattlerSpriteIds[gActiveBattler]]);
     gSprites[gBattlerSpriteIds[gActiveBattler]].data[0] = 35;
     gSprites[gBattlerSpriteIds[gActiveBattler]].data[2] = -40;
     gSprites[gBattlerSpriteIds[gActiveBattler]].data[4] = gSprites[gBattlerSpriteIds[gActiveBattler]].pos1.y;
@@ -1183,7 +1179,7 @@ static void LinkPartnerHandleFaintAnimation(void)
         {
             gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].animationState = 0;
             HandleLowHpMusicChange(&gPlayerParty[gBattlerPartyIndexes[gActiveBattler]], gActiveBattler);
-            PlaySE12WithPanning(SE_POKE_DEAD, SOUND_PAN_ATTACKER);
+            PlaySE12WithPanning(SE_FAINT, SOUND_PAN_ATTACKER);
             gSprites[gBattlerSpriteIds[gActiveBattler]].data[1] = 0;
             gSprites[gBattlerSpriteIds[gActiveBattler]].data[2] = 5;
             gSprites[gBattlerSpriteIds[gActiveBattler]].callback = sub_8039C00;
@@ -1257,7 +1253,7 @@ static void LinkPartnerDoMoveAnimation(void)
     case 1:
         if (!gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].specialAnimActive)
         {
-            sub_805EB9C(0);
+            sub_805EB9C(ST_OAM_AFFINE_OFF);
             DoMoveAnim(move);
             gBattleSpritesDataPtr->healthBoxesData[gActiveBattler].animationState = 2;
         }
@@ -1266,7 +1262,7 @@ static void LinkPartnerDoMoveAnimation(void)
         gAnimScriptCallback();
         if (!gAnimScriptActive)
         {
-            sub_805EB9C(1);
+            sub_805EB9C(ST_OAM_AFFINE_NORMAL);
             if (gBattleSpritesDataPtr->battlerData[gActiveBattler].behindSubstitute && multihit < 2)
             {
                 InitAndLaunchSpecialAnimation(gActiveBattler, gActiveBattler, gActiveBattler, B_ANIM_MON_TO_SUBSTITUTE);
@@ -1432,27 +1428,27 @@ static void LinkPartnerHandleOneReturnValue_Duplicate(void)
     LinkPartnerBufferExecCompleted();
 }
 
-static void LinkPartnerHandleCmd37(void)
+static void LinkPartnerHandleClearUnkVar(void)
 {
-    gUnknown_02022D0C.field_0 = 0;
+    gUnusedControllerStruct.unk = 0;
     LinkPartnerBufferExecCompleted();
 }
 
-static void LinkPartnerHandleCmd38(void)
+static void LinkPartnerHandleSetUnkVar(void)
 {
-    gUnknown_02022D0C.field_0 = gBattleBufferA[gActiveBattler][1];
+    gUnusedControllerStruct.unk = gBattleBufferA[gActiveBattler][1];
     LinkPartnerBufferExecCompleted();
 }
 
-static void LinkPartnerHandleCmd39(void)
+static void LinkPartnerHandleClearUnkFlag(void)
 {
-    gUnknown_02022D0C.flag_x80 = 0;
+    gUnusedControllerStruct.flag = 0;
     LinkPartnerBufferExecCompleted();
 }
 
-static void LinkPartnerHandleCmd40(void)
+static void LinkPartnerHandleToggleUnkFlag(void)
 {
-    gUnknown_02022D0C.flag_x80 ^= 1;
+    gUnusedControllerStruct.flag ^= 1;
     LinkPartnerBufferExecCompleted();
 }
 
@@ -1525,7 +1521,7 @@ static void LinkPartnerHandleIntroTrainerBallThrow(void)
     u8 taskId;
     u32 trainerPicId;
 
-    oamt_add_pos2_onto_pos1(&gSprites[gBattlerSpriteIds[gActiveBattler]]);
+    SetSpritePrimaryCoordsFromSecondaryCoords(&gSprites[gBattlerSpriteIds[gActiveBattler]]);
 
     gSprites[gBattlerSpriteIds[gActiveBattler]].data[0] = 50;
     gSprites[gBattlerSpriteIds[gActiveBattler]].data[2] = -40;
@@ -1564,7 +1560,7 @@ static void LinkPartnerHandleIntroTrainerBallThrow(void)
         gTasks[gBattlerStatusSummaryTaskId[gActiveBattler]].func = Task_HidePartyStatusSummary;
 
     gBattleSpritesDataPtr->animationData->field_9_x1 = 1;
-    gBattlerControllerFuncs[gActiveBattler] = nullsub_112;
+    gBattlerControllerFuncs[gActiveBattler] = SpriteCB_Null2;
 }
 
 static void sub_814DCCC(u8 taskId)
@@ -1680,13 +1676,13 @@ static void LinkPartnerHandleCmd55(void)
 {
     sub_81851A8(&gBattleBufferA[gActiveBattler][4]);
     gBattleOutcome = gBattleBufferA[gActiveBattler][1];
-    gSaveBlock2Ptr->frontier.field_CA9_b = gBattleBufferA[gActiveBattler][2];
+    gSaveBlock2Ptr->frontier.disableRecordBattle = gBattleBufferA[gActiveBattler][2];
     FadeOutMapMusic(5);
     BeginFastPaletteFade(3);
     LinkPartnerBufferExecCompleted();
     gBattlerControllerFuncs[gActiveBattler] = sub_80587B0;
 }
 
-static void nullsub_113(void)
+static void LinkPartnerCmdEnd(void)
 {
 }
