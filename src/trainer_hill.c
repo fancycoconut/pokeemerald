@@ -28,9 +28,7 @@
 #include "constants/items.h"
 #include "constants/layouts.h"
 #include "constants/moves.h"
-#include "constants/maps.h"
 #include "constants/trainers.h"
-#include "constants/easy_chat.h"
 #include "constants/trainer_hill.h"
 #include "constants/trainer_types.h"
 
@@ -201,7 +199,7 @@ static const u16 *const *const sPrizeListSets[] =
     sPrizeLists2
 };
 
-static const u16 sEReader_Pal[] = INCBIN_U16("graphics/misc/trainer_hill_ereader.gbapal");
+static const u16 sEReader_Pal[] = INCBIN_U16("graphics/trainer_hill/ereader.gbapal");
 static const u8 sRecordWinColors[] = {TEXT_COLOR_TRANSPARENT, TEXT_COLOR_DARK_GRAY, TEXT_COLOR_LIGHT_GRAY};
 
 static const struct TrHillTag *const sDataPerTag[] =
@@ -590,13 +588,13 @@ void PrintOnTrainerHillRecordsWindow(void)
 
     SetUpDataStruct();
     FillWindowPixelBuffer(0, PIXEL_FILL(0));
-    x = GetStringCenterAlignXOffset(1, gText_TimeBoard, 0xD0);
-    AddTextPrinterParameterized3(0, 1, x, 2, sRecordWinColors, TEXT_SPEED_FF, gText_TimeBoard);
+    x = GetStringCenterAlignXOffset(FONT_NORMAL, gText_TimeBoard, 0xD0);
+    AddTextPrinterParameterized3(0, FONT_NORMAL, x, 2, sRecordWinColors, TEXT_SKIP_DRAW, gText_TimeBoard);
 
     y = 18;
     for (i = 0; i < 4; i++)
     {
-        AddTextPrinterParameterized3(0, 1, 0, y, sRecordWinColors, TEXT_SPEED_FF, sTagMatchStrings[i]);
+        AddTextPrinterParameterized3(0, FONT_NORMAL, 0, y, sRecordWinColors, TEXT_SKIP_DRAW, sTagMatchStrings[i]);
         y += 15;
         total = GetTimerValue(&gSaveBlock1Ptr->trainerHillTimes[i]);
         minutes = total / (60 * 60);
@@ -608,13 +606,13 @@ void PrintOnTrainerHillRecordsWindow(void)
         secondsFraction = (total * 168) / 100;
         ConvertIntToDecimalStringN(gStringVar3, secondsFraction, STR_CONV_MODE_LEADING_ZEROS, 2);
         StringExpandPlaceholders(StringCopy(gStringVar4, gText_TimeCleared), gText_XMinYDotZSec);
-        x = GetStringRightAlignXOffset(1, gStringVar4, 0xD0);
-        AddTextPrinterParameterized3(0, 1, x, y, sRecordWinColors, TEXT_SPEED_FF, gStringVar4);
+        x = GetStringRightAlignXOffset(FONT_NORMAL, gStringVar4, 0xD0);
+        AddTextPrinterParameterized3(0, FONT_NORMAL, x, y, sRecordWinColors, TEXT_SKIP_DRAW, gStringVar4);
         y += 17;
     }
 
     PutWindowTilemap(0);
-    CopyWindowToVram(0, 3);
+    CopyWindowToVram(0, COPYWIN_FULL);
     FreeDataStruct();
 }
 
@@ -679,9 +677,9 @@ static u16 GetMetatileForFloor(u8 floorId, u32 x, u32 y, u32 stride) // stride i
 
     impassable = (sHillData->floors[floorId].display.collisionData[y] >> (15 - x) & 1);
     metatile = sHillData->floors[floorId].display.metatileData[stride * y + x] + NUM_METATILES_IN_PRIMARY;
-    elevation = 3 << METATILE_ELEVATION_SHIFT;
+    elevation = 3 << MAPGRID_ELEVATION_SHIFT;
 
-    return ((impassable << METATILE_COLLISION_SHIFT) & METATILE_COLLISION_MASK) | elevation | (metatile & METATILE_ID_MASK);
+    return ((impassable << MAPGRID_COLLISION_SHIFT) & MAPGRID_COLLISION_MASK) | elevation | (metatile & MAPGRID_METATILE_ID_MASK);
 }
 
 void GenerateTrainerHillFloorLayout(u16 *mapArg)
