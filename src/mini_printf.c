@@ -97,7 +97,7 @@ static s32 _putsAscii(char *s, s32 len, void *buf)
 
     if (!buf) 
         return len;
-    
+
     b = buf;
     p0 = b->buffer;
 
@@ -120,7 +120,7 @@ static s32 _putsEncoded(char *s, s32 len, void *buf)
 
     if (!buf) 
         return len;
-    
+
     b = buf;
     p0 = b->buffer;
 
@@ -142,7 +142,7 @@ static s32 mini_strlen(const char *s)
 	return len;
 }
 
-static s32 mini_itoa(u32 value, u32 radix, s32 uppercase, bool32 unsig, char *buffer)
+static s32 mini_itoa(s32 value, u32 radix, s32 uppercase, bool32 unsig, char *buffer)
 {
     char *pbuffer = buffer;
     s32 negative = 0;
