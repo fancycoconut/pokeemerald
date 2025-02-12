@@ -230,7 +230,7 @@ enum {
     PALTAG_TRIANGLE_CURSOR,
     PALTAG_RECTANGLE_CURSOR,
     PALTAG_MISC_UI,
-    PALTAG_RS_INTERVIEW_FRAME,  
+    PALTAG_RS_INTERVIEW_FRAME,
 };
 
 enum {
@@ -240,7 +240,7 @@ enum {
     GFXTAG_START_SELECT_BUTTONS,
     GFXTAG_MODE_WINDOW,
     GFXTAG_RS_INTERVIEW_FRAME,
-    GFXTAG_BUTTON_WINDOW,  
+    GFXTAG_BUTTON_WINDOW,
 };
 
 
@@ -1478,10 +1478,10 @@ void ShowEasyChatScreen(void)
         break;
     case EASY_CHAT_TYPE_BARD_SONG:
         bard = &gSaveBlock1Ptr->oldMan.bard;
-        for (i = 0; i < BARD_SONG_LENGTH; i ++)
-            bard->temporaryLyrics[i] = bard->songLyrics[i];
+        for (i = 0; i < NUM_BARD_SONG_WORDS; i ++)
+            bard->newSongLyrics[i] = bard->songLyrics[i];
 
-        words = bard->temporaryLyrics;
+        words = bard->newSongLyrics;
         break;
     case EASY_CHAT_TYPE_INTERVIEW:
         words = gSaveBlock1Ptr->tvShows[gSpecialVar_0x8005].bravoTrainer.words;
