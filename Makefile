@@ -94,13 +94,11 @@ C_SUBDIR = src
 ASM_SUBDIR = asm
 DATA_SRC_SUBDIR = src/data
 DATA_ASM_SUBDIR = data
-SONG_SUBDIR = sound/songs
 MID_SUBDIR = sound/songs/midi
 
 C_BUILDDIR = $(OBJ_DIR)/$(C_SUBDIR)
 ASM_BUILDDIR = $(OBJ_DIR)/$(ASM_SUBDIR)
 DATA_ASM_BUILDDIR = $(OBJ_DIR)/$(DATA_ASM_SUBDIR)
-SONG_BUILDDIR = $(OBJ_DIR)/$(SONG_SUBDIR)
 MID_BUILDDIR = $(OBJ_DIR)/$(MID_SUBDIR)
 
 SHELL := bash -o pipefail
@@ -139,7 +137,7 @@ AUTO_GEN_TARGETS :=
 include make_tools.mk
 # Tool executables
 GFX       := $(TOOLS_DIR)/gbagfx/gbagfx$(EXE)
-AIF       := $(TOOLS_DIR)/aif2pcm/aif2pcm$(EXE)
+WAV2AGB   := $(TOOLS_DIR)/wav2agb/wav2agb$(EXE)
 MID       := $(TOOLS_DIR)/mid2agb/mid2agb$(EXE)
 SCANINC   := $(TOOLS_DIR)/scaninc/scaninc$(EXE)
 PREPROC   := $(TOOLS_DIR)/preproc/preproc$(EXE)
@@ -205,19 +203,13 @@ C_ASM_OBJS := $(patsubst $(C_SUBDIR)/%.s,$(C_BUILDDIR)/%.o,$(C_ASM_SRCS))
 ASM_SRCS := $(wildcard $(ASM_SUBDIR)/*.s)
 ASM_OBJS := $(patsubst $(ASM_SUBDIR)/%.s,$(ASM_BUILDDIR)/%.o,$(ASM_SRCS))
 
-# get all the data/*.s files EXCEPT the ones with specific rules
-REGULAR_DATA_ASM_SRCS := $(filter-out $(DATA_ASM_SUBDIR)/maps.s $(DATA_ASM_SUBDIR)/map_events.s, $(wildcard $(DATA_ASM_SUBDIR)/*.s))
-
 DATA_ASM_SRCS := $(wildcard $(DATA_ASM_SUBDIR)/*.s)
 DATA_ASM_OBJS := $(patsubst $(DATA_ASM_SUBDIR)/%.s,$(DATA_ASM_BUILDDIR)/%.o,$(DATA_ASM_SRCS))
-
-SONG_SRCS := $(wildcard $(SONG_SUBDIR)/*.s)
-SONG_OBJS := $(patsubst $(SONG_SUBDIR)/%.s,$(SONG_BUILDDIR)/%.o,$(SONG_SRCS))
 
 MID_SRCS := $(wildcard $(MID_SUBDIR)/*.mid)
 MID_OBJS := $(patsubst $(MID_SUBDIR)/%.mid,$(MID_BUILDDIR)/%.o,$(MID_SRCS))
 
-OBJS     := $(C_OBJS) $(C_ASM_OBJS) $(ASM_OBJS) $(DATA_ASM_OBJS) $(SONG_OBJS) $(MID_OBJS)
+OBJS     := $(C_OBJS) $(C_ASM_OBJS) $(ASM_OBJS) $(DATA_ASM_OBJS) $(MID_OBJS)
 OBJS_REL := $(patsubst $(OBJ_DIR)/%,%,$(OBJS))
 
 SUBDIRS  := $(sort $(dir $(OBJS)))
@@ -272,7 +264,7 @@ generated: $(AUTO_GEN_TARGETS)
 %.s:   ;
 %.png: ;
 %.pal: ;
-%.aif: ;
+%.wav: ;
 
 %.1bpp:   %.png  ; $(GFX) $< $@
 %.4bpp:   %.png  ; $(GFX) $< $@
@@ -313,10 +305,10 @@ ifneq ($(KEEP_TEMPS),1)
 	@echo "$(CC1) <flags> -o $@ $<"
 	@$(CPP) $(CPPFLAGS) $< | $(PREPROC) -i $< charmap.txt | $(CC1) $(CFLAGS) -o - - | cat - <(echo -e ".text\n\t.align\t2, 0") | $(AS) $(ASFLAGS) -o $@ -
 else
-	@$(CPP) $(CPPFLAGS) $< -o $*.i
-	@$(PREPROC) $*.i charmap.txt | $(CC1) $(CFLAGS) -o $*.s
-	@echo -e ".text\n\t.align\t2, 0\n" >> $*.s
-	$(AS) $(ASFLAGS) -o $@ $*.s
+	@$(CPP) $(CPPFLAGS) $< -o $(C_BUILDDIR)/$*.i
+	@$(PREPROC) $(C_BUILDDIR)/$*.i charmap.txt | $(CC1) $(CFLAGS) -o $(C_BUILDDIR)/$*.s
+	@echo -e ".text\n\t.align\t2, 0\n" >> $(C_BUILDDIR)/$*.s
+	$(AS) $(ASFLAGS) -o $@ $(C_BUILDDIR)/$*.s
 endif
 
 $(C_BUILDDIR)/%.d: $(C_SUBDIR)/%.c
@@ -353,7 +345,7 @@ $(DATA_ASM_BUILDDIR)/%.d: $(DATA_ASM_SUBDIR)/%.s
 	$(SCANINC) -M $@ $(INCLUDE_SCANINC_ARGS) -I "" $<
 
 ifneq ($(NODEP),1)
--include $(addprefix $(OBJ_DIR)/,$(REGULAR_DATA_ASM_SRCS:.s=.d))
+-include $(addprefix $(OBJ_DIR)/,$(DATA_ASM_SRCS:.s=.d))
 endif
 
 $(OBJ_DIR)/sym_bss.ld: sym_bss.txt
